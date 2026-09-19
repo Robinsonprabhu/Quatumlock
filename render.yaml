@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: doomsday-escape-room
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_PASSKEY
+        value: robin123
+      - key: ADMIN_SECRET
+        value: robin123
+      - key: MONGODB_URI
+        sync: false
