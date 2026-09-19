@@ -1997,26 +1997,8 @@ export const Database = {
       throw new Error('COUNTDOWN EXPIRED: The session timer has ended. Chamber inputs are locked.');
     }
 
-    // Verify previous chamber was solved before allowing submission on current chamber
-    const assignments = db.question_assignments[participantId] || [];
-    const currentAssign = assignments.find(
-      (a) => a.questionId === questionId && a.sessionNumber === sessionNumber
-    );
-    if (currentAssign && currentAssign.questionOrder > 1) {
-      const prevOrder = currentAssign.questionOrder - 1;
-      const prevAssign = assignments.find(
-        (a) => a.sessionNumber === sessionNumber && a.questionOrder === prevOrder
-      );
-      if (prevAssign) {
-        const prevSolved = db.answers.some(
-          (ans) => ans.participantId === participantId && ans.questionId === prevAssign.questionId && ans.isCorrect
-        );
-        if (!prevSolved) {
-          const prevLevelNum = prevOrder + (sessionNumber === 2 ? 7 : 0);
-          throw new Error(`CHAMBER LOCKED: You must unlock and solve Room ${String(prevLevelNum).padStart(2, '0')} before submitting this chamber.`);
-        }
-      }
-    }
+    // Sequential lock removed — participants can attempt any assigned room in any order.
+    // The room list is shown in order in the UI so natural progression is encouraged.
 
     // Clean answer input
     const clean = (val) => String(val || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
