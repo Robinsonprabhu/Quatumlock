@@ -5,12 +5,20 @@ import { syncToMongo, loadDataFromMongo, seedDataToMongo, isMongoConnected } fro
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_FILE = path.join(__dirname, 'data', 'escape_db.json');
 
-// Ensure data directory exists
-const dataDir = path.dirname(DB_FILE);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+// On Vercel serverless, only /tmp is writable. Use it for local fallback.
+// MongoDB Atlas is always the primary store in production.
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DB_FILE = IS_VERCEL
+  ? '/tmp/escape_db.json'
+  : path.join(__dirname, 'data', 'escape_db.json');
+
+// Ensure data directory exists (local dev only — not needed on Vercel /tmp)
+if (!IS_VERCEL) {
+  const dataDir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

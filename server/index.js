@@ -608,9 +608,12 @@ app.get('*', (req, res) => {
 function startServer(port) {
   const server = app.listen(port, '0.0.0.0', () => {
     try {
-      const dataDir = path.join(__dirname, 'data');
-      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(path.join(dataDir, '.backend_port'), String(port), 'utf8');
+      // Only write port file locally (Vercel filesystem is read-only)
+      if (!process.env.VERCEL) {
+        const dataDir = path.join(__dirname, 'data');
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(path.join(dataDir, '.backend_port'), String(port), 'utf8');
+      }
     } catch (e) {}
     console.log(`\n[DOOM-OS SERVER] Express backend running on http://127.0.0.1:${port}\n`);
   });
