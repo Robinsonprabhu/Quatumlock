@@ -135,7 +135,11 @@ export function onMongoConnect(listener) {
 let hasLoggedOfflineNotice = false;
 
 export async function connectMongoDB() {
-  if (isConnected) return true;
+  // Reuse existing connection (critical for serverless — Vercel/Lambda keep connections warm)
+  if (mongoose.connection.readyState === 1) {
+    isConnected = true;
+    return true;
+  }
 
   const sanitizedUri = MONGODB_URI.replace(/\/\/.*@/, '//***:***@');
   try {
@@ -143,8 +147,13 @@ export async function connectMongoDB() {
       console.log(`[MongoDB] Connecting to cluster (${sanitizedUri})...`);
     }
     await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 4000,
-      connectTimeoutMS: 5000
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      // Keep connections alive across serverless invocations
+      maxPoolSize: 10,
+      minPoolSize: 0,
+      maxIdleTimeMS: 270000
     });
     isConnected = true;
     console.log('[MongoDB] ✅ Successfully connected to MongoDB Escaperoom cluster!');

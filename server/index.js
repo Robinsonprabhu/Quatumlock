@@ -24,6 +24,16 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.text({ limit: '50mb' }));
 
+// Ensure MongoDB is connected on every API request (critical for Vercel serverless cold starts)
+app.use('/api', async (req, res, next) => {
+  try {
+    await connectMongoDB();
+  } catch (e) {
+    // non-fatal: fallback to local JSON db
+  }
+  next();
+});
+
 // Global body parser error handler
 app.use((err, req, res, next) => {
   if (err && (err.type === 'entity.too.large' || err.status === 413)) {
