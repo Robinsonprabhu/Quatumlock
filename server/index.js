@@ -458,7 +458,7 @@ app.get('/api/admin/progress', adminAuth, (req, res) => {
   });
 });
 
-// Get participants list
+// Get participants list & credentials
 app.get('/api/admin/participants', adminAuth, (req, res) => {
   const progressData = Database.getAdminProgress();
   res.json({
@@ -467,6 +467,67 @@ app.get('/api/admin/participants', adminAuth, (req, res) => {
     participants: progressData.participants
   });
 });
+
+// Admin Create Participant Credentials (supports /participant/create, /participants/create, and POST /participants)
+const handleAdminCreateParticipant = (req, res) => {
+  try {
+    const { teamName, teamPassword, passcode } = req.body;
+    const pass = teamPassword || passcode || '';
+    const participant = Database.createParticipantCredentials(teamName, pass);
+    res.json({
+      success: true,
+      participant: {
+        id: participant.id,
+        teamName: participant.teamName,
+        teamPassword: participant.teamPassword,
+        token: participant.token,
+        registeredAt: participant.registeredAt
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: 'CREATION_FAILED', message: err.message });
+  }
+};
+
+app.post('/api/admin/participant/create', adminAuth, handleAdminCreateParticipant);
+app.post('/api/admin/participants/create', adminAuth, handleAdminCreateParticipant);
+
+// Admin Update Participant Password Credentials
+const handleAdminUpdateParticipant = (req, res) => {
+  try {
+    const { participantId, teamPassword, passcode } = req.body;
+    const pass = teamPassword || passcode || '';
+    const updated = Database.updateParticipantCredentials(participantId, pass);
+    res.json({
+      success: true,
+      participant: {
+        id: updated.id,
+        teamName: updated.teamName,
+        teamPassword: updated.teamPassword
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ error: 'UPDATE_FAILED', message: err.message });
+  }
+};
+
+app.post('/api/admin/participant/update', adminAuth, handleAdminUpdateParticipant);
+app.post('/api/admin/participants/update', adminAuth, handleAdminUpdateParticipant);
+
+// Admin Delete Participant Credentials
+const handleAdminDeleteParticipant = (req, res) => {
+  try {
+    const deleted = Database.deleteParticipant(req.params.id);
+    res.json({
+      success: deleted
+    });
+  } catch (err) {
+    res.status(400).json({ error: 'DELETE_FAILED', message: err.message });
+  }
+};
+
+app.delete('/api/admin/participant/:id', adminAuth, handleAdminDeleteParticipant);
+app.delete('/api/admin/participants/:id', adminAuth, handleAdminDeleteParticipant);
 
 // Admin Leaderboard
 app.get('/api/admin/leaderboard', adminAuth, (req, res) => {

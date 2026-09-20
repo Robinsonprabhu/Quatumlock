@@ -1764,31 +1764,36 @@ export const Database = {
     return true;
   },
 
-  // --- PARTICIPANTS & RANDOM ASSIGNMENTS ---
-  registerParticipant(teamNameRaw, teamPasswordRaw = '') {
+  // --- PARTICIPANTS & CREDENTIAL MANAGEMENT ---
+  createParticipantCredentials(teamNameRaw, teamPasswordRaw = '') {
     const teamName = String(teamNameRaw || '').trim().toUpperCase();
     const teamPassword = String(teamPasswordRaw || '').trim();
     if (!teamName) {
-      throw new Error('Team callsign is required.');
+      throw new Error('Team name is required.');
+    }
+    if (!teamPassword) {
+      throw new Error('Password is required.');
     }
 
-    // Find existing participant by teamName
-    let participant = Object.values(db.participants).find((p) => p.teamName === teamName);
-    if (participant) {
-      throw new Error(`CALLSIGN TAKEN: Team '${teamName}' is already registered. If this is your team, please switch to the 'RE-ENTER MISSION' tab and enter your passcode.`);
+    // Check if teamName already exists
+    let existing = Object.values(db.participants).find((p) => p.teamName === teamName);
+    if (existing) {
+      throw new Error(`Team '${teamName}' already exists. Please choose a different team name.`);
     }
 
-    // Register new unique team
+    // Register new participant credentials
     const participantId = `TEAM_${Date.now()}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const token = `tok_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
 
-    participant = {
+    const participant = {
       id: participantId,
       teamName,
       token,
-      teamPassword: teamPassword || null,
+      teamPassword: teamPassword,
+      passcode: teamPassword,
       registeredAt: Date.now(),
-      lastActiveAt: Date.now()
+      lastActiveAt: Date.now(),
+      createdByAdmin: true
     };
 
     db.participants[participantId] = participant;
@@ -1814,20 +1819,63 @@ export const Database = {
     return participant;
   },
 
+  updateParticipantCredentials(participantId, newTeamPasswordRaw) {
+    const participant = db.participants[participantId];
+    if (!participant) {
+      throw new Error('Participant not found.');
+    }
+    const newPassword = String(newTeamPasswordRaw || '').trim();
+    if (!newPassword) {
+      throw new Error('New password cannot be empty.');
+    }
+
+    participant.teamPassword = newPassword;
+    participant.passcode = newPassword;
+    saveDb();
+
+    syncToMongo('Participant', 'upsert', { id: participant.id }, participant);
+    return participant;
+  },
+
+  deleteParticipant(participantId) {
+    if (!db.participants[participantId]) {
+      return false;
+    }
+    delete db.participants[participantId];
+    delete db.participant_sessions[participantId];
+    delete db.question_assignments[participantId];
+    delete db.hints_used[participantId];
+    if (db.answers) {
+      db.answers = db.answers.filter((ans) => ans.participantId !== participantId);
+    }
+    saveDb();
+
+    syncToMongo('Participant', 'deleteMany', { id: participantId });
+    syncToMongo('ParticipantSession', 'deleteMany', { participantId });
+    syncToMongo('QuestionAssignment', 'deleteMany', { participantId });
+    syncToMongo('HintUsed', 'deleteMany', { participantId });
+    syncToMongo('Answer', 'deleteMany', { participantId });
+    return true;
+  },
+
+  registerParticipant(teamNameRaw, teamPasswordRaw = '') {
+    return this.createParticipantCredentials(teamNameRaw, teamPasswordRaw);
+  },
+
   loginParticipant(teamNameRaw, teamPasswordRaw = '') {
     const teamName = String(teamNameRaw || '').trim().toUpperCase();
     const teamPassword = String(teamPasswordRaw || '').trim();
     if (!teamName) {
-      throw new Error('Team callsign is required.');
+      throw new Error('Team name is required.');
     }
 
     const participant = Object.values(db.participants).find((p) => p.teamName === teamName);
     if (!participant) {
-      throw new Error(`Team '${teamName}' not found. Please click 'REGISTER NEW TEAM' first.`);
+      throw new Error(`ACCESS DENIED: Team '${teamName}' not found. Please obtain login credentials from the administrator.`);
     }
 
     if (participant.teamPassword && participant.teamPassword !== teamPassword) {
-      throw new Error('INCORRECT PASSCODE: Please enter the valid passcode created for this team.');
+      throw new Error('INCORRECT PASSWORD: Enter the password provided by your event administrator.');
     }
 
     participant.lastActiveAt = Date.now();
@@ -1916,6 +1964,12 @@ export const Database = {
   },
 
   getParticipantQuestionsForSession(participantId, sessionNumber) {
+    // Auto-generate question assignments if participant has none (e.g. registered before
+    // assignments existed, or assignments lost during DB sync from MongoDB).
+    if (!db.question_assignments[participantId] || db.question_assignments[participantId].length === 0) {
+      console.log(`[DB] No question assignments found for ${participantId} — auto-generating now.`);
+      this.generateRandomQuestionsForParticipant(participantId);
+    }
     const allAssignments = db.question_assignments[participantId] || [];
     const sessionAssignments = allAssignments.filter((a) => a.sessionNumber === sessionNumber);
 
@@ -2252,6 +2306,7 @@ export const Database = {
       return {
         id: p.id,
         teamName: p.teamName,
+        teamPassword: p.teamPassword || p.passcode || '',
         registeredAt: p.registeredAt,
         lastActiveAt: p.lastActiveAt,
         currentSession,

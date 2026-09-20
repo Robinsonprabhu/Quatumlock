@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { contentStore } from '../../engine/contentStore';
 
-const ADMIN_SECRET = 'DOOM_ADMIN_2026';
+const ADMIN_SECRET = 'robin123';
 
 const QUESTION_JSON_SCHEMA_EXAMPLE = {
   id: 'Q21',
@@ -50,6 +50,13 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
   const [durationInput, setDurationInput] = useState(30);
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
   const [mongoStatus, setMongoStatus] = useState({ connected: false, uri: '' });
+
+  // Participant Credentials State
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamPassword, setNewTeamPassword] = useState('');
+  const [editingParticipantId, setEditingParticipantId] = useState(null);
+  const [editTeamPassword, setEditTeamPassword] = useState('');
+  const [credentialsSearch, setCredentialsSearch] = useState('');
 
   // Modals
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
@@ -233,6 +240,113 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
         console.error('[Admin] Reset failed:', err);
       }
     }
+  };
+
+  // ─── PARTICIPANT CREDENTIAL HANDLERS ───
+  const handleGenerateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewTeamPassword(`PASS-${code}`);
+  };
+
+  const parseJsonResponse = async (res) => {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return await res.json();
+    }
+    throw new Error(`Server returned HTML instead of JSON (Status ${res.status}). Please restart your terminal server ('npm run dev') to load updated API routes.`);
+  };
+
+  const handleCreateParticipantCredentials = async (e) => {
+    if (e) e.preventDefault();
+    if (!newTeamName.trim()) {
+      alert('Please enter a team name.');
+      return;
+    }
+    if (!newTeamPassword.trim()) {
+      alert('Please enter a team password.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/participant/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': adminToken
+        },
+        body: JSON.stringify({ teamName: newTeamName.trim(), teamPassword: newTeamPassword.trim() })
+      });
+      const data = await parseJsonResponse(res);
+      if (res.ok && data.success) {
+        notifySaved(`✅ CREATED CREDENTIALS FOR '${data.participant.teamName}'`);
+        setNewTeamName('');
+        setNewTeamPassword('');
+        fetchAdminProgress();
+      } else {
+        alert(data.message || data.error || 'Failed to create credentials.');
+      }
+    } catch (err) {
+      alert('Error creating credentials: ' + err.message);
+    }
+  };
+
+  const handleUpdateParticipantPassword = async (participantId) => {
+    if (!editTeamPassword.trim()) {
+      alert('Password cannot be empty.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/participant/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': adminToken
+        },
+        body: JSON.stringify({ participantId, teamPassword: editTeamPassword.trim() })
+      });
+      const data = await parseJsonResponse(res);
+      if (res.ok && data.success) {
+        notifySaved(`✅ PASSWORD UPDATED FOR '${data.participant.teamName}'`);
+        setEditingParticipantId(null);
+        setEditTeamPassword('');
+        fetchAdminProgress();
+      } else {
+        alert(data.message || data.error || 'Failed to update password.');
+      }
+    } catch (err) {
+      alert('Error updating password: ' + err.message);
+    }
+  };
+
+  const handleDeleteParticipant = async (participantId, teamName) => {
+    if (!window.confirm(`⚠️ Are you sure you want to delete participant team '${teamName}' and all associated scores?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/participant/${participantId}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-token': adminToken }
+      });
+      const data = await parseJsonResponse(res);
+      if (res.ok && data.success) {
+        notifySaved(`🗑️ DELETED PARTICIPANT '${teamName}'`);
+        fetchAdminProgress();
+      } else {
+        alert(data.message || data.error || 'Failed to delete participant.');
+      }
+    } catch (err) {
+      alert('Error deleting participant: ' + err.message);
+    }
+  };
+
+  const handleCopyCredentials = (team) => {
+    const credText = `Team Name: ${team.teamName}\nPassword: ${team.teamPassword || team.passcode || 'N/A'}`;
+    navigator.clipboard.writeText(credText);
+    notifySaved(`📋 COPIED CREDENTIALS FOR '${team.teamName}' TO CLIPBOARD`);
   };
 
   // ─── QUESTION BANK CRUD HANDLERS ───
@@ -452,6 +566,12 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
             onClick={() => setActiveTab('event_control')}
           >
             ⚡ EVENT & TIMER CONTROL
+          </button>
+          <button
+            className={`admin-nav-tab ${activeTab === 'credentials' ? 'admin-nav-tab--active' : ''}`}
+            onClick={() => setActiveTab('credentials')}
+          >
+            🔑 PARTICIPANT CREDENTIALS ({eventProgress.totalParticipants || 0})
           </button>
           <button
             className={`admin-nav-tab ${activeTab === 'leaderboard' ? 'admin-nav-tab--active' : ''}`}
@@ -708,6 +828,219 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
                       {eventProgress.participants.filter(p => p.session2Completed).length} / {eventProgress.totalParticipants} DONE
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ──────────────────────────────────────────────────────────── */}
+          {/* TAB: PARTICIPANT CREDENTIALS MANAGEMENT                       */}
+          {/* ──────────────────────────────────────────────────────────── */}
+          {activeTab === 'credentials' && (
+            <div className="admin-section">
+              {/* CREATE PARTICIPANT CREDENTIALS CARD */}
+              <div className="admin-card" style={{ marginBottom: '20px' }}>
+                <div className="admin-card__title">
+                  <span>CREATE PARTICIPANT LOGIN CREDENTIALS</span>
+                  <span className="admin-badge" style={{ color: 'var(--doom-green-bright)' }}>
+                    STORED IN BACKEND DATABASE & MONGODB
+                  </span>
+                </div>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#9bb5a7', marginBottom: '16px', lineHeight: '1.4' }}>
+                  Create login credentials for participants. The credentials created here are stored securely in the backend database. Share these credentials with the participants so they can log in.
+                </p>
+
+                <form onSubmit={handleCreateParticipantCredentials} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: '1 1 240px' }}>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--doom-green)', marginBottom: '6px' }}>
+                      TEAM NAME
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ALPHA-TEAM"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      className="admin-input"
+                      style={{ width: '100%', padding: '10px 14px' }}
+                    />
+                  </div>
+
+                  <div style={{ flex: '1 1 240px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--doom-green)' }}>
+                        PASSWORD
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleGenerateRandomPassword}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#00e5ff',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        🎲 Auto-Generate
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. PASS-9281"
+                      value={newTeamPassword}
+                      onChange={(e) => setNewTeamPassword(e.target.value)}
+                      className="admin-input"
+                      style={{ width: '100%', padding: '10px 14px' }}
+                    />
+                  </div>
+
+                  <div style={{ flex: '0 0 auto' }}>
+                    <button
+                      type="submit"
+                      className="admin-btn admin-btn--primary"
+                      style={{ padding: '11px 24px', fontWeight: 700, fontSize: '0.85rem' }}
+                    >
+                      ⚡ CREATE & STORE CREDENTIALS
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* STORED CREDENTIALS LIST CARD */}
+              <div className="admin-card">
+                <div className="admin-card__title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <span>STORED PARTICIPANT CREDENTIALS ({eventProgress.participants?.length || 0})</span>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="🔍 Search team credentials..."
+                    value={credentialsSearch}
+                    onChange={(e) => setCredentialsSearch(e.target.value)}
+                    className="admin-input"
+                    style={{ width: '240px', padding: '6px 12px', fontSize: '0.8rem' }}
+                  />
+                </div>
+
+                <div style={{ overflowX: 'auto', marginTop: '14px' }}>
+                  <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--doom-border-dim)', color: 'var(--doom-green-bright)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                        <th style={{ padding: '10px' }}>TEAM NAME</th>
+                        <th style={{ padding: '10px' }}>PASSWORD (STORED IN BACKEND)</th>
+                        <th style={{ padding: '10px' }}>CREATED AT</th>
+                        <th style={{ padding: '10px' }}>LAST ACTIVE</th>
+                        <th style={{ padding: '10px' }}>PROGRESS</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(!eventProgress.participants || eventProgress.participants.length === 0) ? (
+                        <tr>
+                          <td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: '#688575', fontFamily: 'var(--font-mono)' }}>
+                            No participant credentials created yet. Use the form above to create login credentials.
+                          </td>
+                        </tr>
+                      ) : (
+                        eventProgress.participants
+                          .filter(p => p.teamName.toLowerCase().includes(credentialsSearch.toLowerCase()))
+                          .map((p) => {
+                            const isEditing = editingParticipantId === p.id;
+                            const createdDate = p.registeredAt ? new Date(p.registeredAt).toLocaleString() : 'N/A';
+                            const lastActiveDate = p.lastActiveAt ? new Date(p.lastActiveAt).toLocaleTimeString() : 'Never';
+
+                            return (
+                              <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem' }}>
+                                <td style={{ padding: '12px 10px', fontWeight: 'bold', color: '#fff', fontFamily: 'var(--font-mono)' }}>
+                                  🛡️ {p.teamName}
+                                </td>
+                                <td style={{ padding: '12px 10px', fontFamily: 'var(--font-mono)' }}>
+                                  {isEditing ? (
+                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                      <input
+                                        type="text"
+                                        value={editTeamPassword}
+                                        onChange={(e) => setEditTeamPassword(e.target.value)}
+                                        className="admin-input"
+                                        style={{ padding: '4px 8px', fontSize: '0.8rem', width: '130px' }}
+                                      />
+                                      <button
+                                        onClick={() => handleUpdateParticipantPassword(p.id)}
+                                        className="admin-btn admin-btn--primary"
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingParticipantId(null)}
+                                        className="admin-btn"
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem', background: '#333' }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span style={{
+                                      background: 'rgba(0, 229, 255, 0.1)',
+                                      border: '1px solid rgba(0, 229, 255, 0.3)',
+                                      color: '#00e5ff',
+                                      padding: '4px 10px',
+                                      borderRadius: '4px',
+                                      fontWeight: '600',
+                                      letterSpacing: '0.05em'
+                                    }}>
+                                      {p.teamPassword || p.passcode || '(no pass)'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '12px 10px', color: '#8aa697', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                                  {createdDate}
+                                </td>
+                                <td style={{ padding: '12px 10px', color: p.lastActiveAt ? '#00ff66' : '#688575', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                                  {lastActiveDate}
+                                </td>
+                                <td style={{ padding: '12px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#fff' }}>
+                                  {p.progress || '0 / 7'}
+                                </td>
+                                <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                    <button
+                                      onClick={() => handleCopyCredentials(p)}
+                                      className="admin-btn"
+                                      style={{ padding: '5px 10px', fontSize: '0.75rem', background: 'rgba(0, 255, 102, 0.15)', border: '1px solid rgba(0, 255, 102, 0.4)', color: '#00ff66' }}
+                                      title="Copy Team Name & Password to clipboard"
+                                    >
+                                      📋 Copy
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingParticipantId(p.id);
+                                        setEditTeamPassword(p.teamPassword || p.passcode || '');
+                                      }}
+                                      className="admin-btn"
+                                      style={{ padding: '5px 10px', fontSize: '0.75rem', background: 'rgba(0, 229, 255, 0.15)', border: '1px solid rgba(0, 229, 255, 0.4)', color: '#00e5ff' }}
+                                      title="Edit Team Password"
+                                    >
+                                      ✏️ Edit Pass
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteParticipant(p.id, p.teamName)}
+                                      className="admin-btn"
+                                      style={{ padding: '5px 10px', fontSize: '0.75rem', background: 'rgba(255, 50, 50, 0.15)', border: '1px solid rgba(255, 50, 50, 0.4)', color: '#ff4444' }}
+                                      title="Delete Participant"
+                                    >
+                                      🗑️ Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

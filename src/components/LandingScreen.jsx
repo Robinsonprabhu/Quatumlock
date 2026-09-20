@@ -159,28 +159,26 @@ export const LandingScreen = ({
 
   if (!isActive) return null;
 
-  // Handle Team Submit & Cinematic Click Transition
+  // Handle Team Login Submit & Cinematic Transition
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (!teamCallsign.trim()) {
-      setErrorMessage('Please enter an operative / team callsign.');
+      setErrorMessage('Please enter your team name.');
+      return;
+    }
+    if (!teamPasscode.trim()) {
+      setErrorMessage('Please enter your team password.');
       return;
     }
 
     setErrorMessage('');
     setIsSubmitting(true);
 
-    let result;
-    if (authMode === 'login') {
-      result = onLoginTeam
-        ? await onLoginTeam(teamCallsign.trim(), teamPasscode.trim())
-        : await onEnterProtocol(teamCallsign.trim(), teamPasscode.trim());
-    } else {
-      result = await onEnterProtocol(teamCallsign.trim(), teamPasscode.trim());
-    }
+    const loginFn = onLoginTeam || onEnterProtocol;
+    const result = await loginFn(teamCallsign.trim(), teamPasscode.trim());
 
     if (result && !result.success) {
-      setErrorMessage(result.message || (authMode === 'login' ? 'Authentication failed. Please check callsign & passcode.' : 'Registration failed.'));
+      setErrorMessage(result.message || 'Authentication failed. Please check team name and password.');
       setIsSubmitting(false);
     } else if (result && result.success) {
       // Trigger cinematic breach transition
@@ -285,48 +283,29 @@ export const LandingScreen = ({
             Five rooms. Five challenges. One way out.
           </p>
 
-          {/* Operative Registration / Login Form */}
+          {/* Operative Login Form - Access Needed */}
           <div className={`hero-form-card ${introStage >= 5 ? 'hero-form-card--visible' : ''}`}>
-            {/* Mode Selector Tabs: SIGN UP vs RE-ENTER */}
-            <div className="hero-auth-tabs">
-              <button
-                type="button"
-                className={`hero-auth-tab ${authMode === 'signup' ? 'hero-auth-tab--active' : ''}`}
-                onClick={() => {
-                  setAuthMode('signup');
-                  setErrorMessage('');
-                }}
-              >
-                <span>⚡ REGISTER NEW TEAM</span>
-              </button>
-              <button
-                type="button"
-                className={`hero-auth-tab ${authMode === 'login' ? 'hero-auth-tab--active' : ''}`}
-                onClick={() => {
-                  setAuthMode('login');
-                  setErrorMessage('');
-                }}
-              >
-                <span>🔄 RE-ENTER MISSION</span>
-              </button>
+            {/* Header: Access Needed */}
+            <div className="hero-card-header" style={{ marginBottom: '14px', borderBottom: '1px solid rgba(0, 255, 102, 0.2)', paddingBottom: '10px', textAlign: 'left', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00ff66', fontSize: '1.35rem', fontWeight: 800, fontFamily: 'var(--font-display)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <span>🔒</span>
+                <span>ACCESS NEEDED</span>
+              </div>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#9bb5a7', margin: '6px 0 0', lineHeight: '1.4' }}>
+                Enter the team name and password created by your event administrator to launch your mission.
+              </p>
             </div>
-
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#9bb5a7', margin: '0 0 12px', lineHeight: '1.4' }}>
-              {authMode === 'signup'
-                ? 'Create a unique team callsign and secret passcode to initiate your 10-chamber protocol.'
-                : 'Already registered? Enter your team callsign and passcode to resume exactly where you left off.'}
-            </p>
 
             <form onSubmit={handleSubmit} style={{ width: '100%' }}>
               <div className="hero-form-grid">
                 <div className="hero-input-group">
                   <label className="hero-input-label">
-                    {authMode === 'signup' ? 'NEW TEAM CALLSIGN' : 'REGISTERED CALLSIGN'}
+                    TEAM NAME
                   </label>
                   <input
                     type="text"
                     id="input-team-name"
-                    placeholder="e.g. STARK-AVENGERS"
+                    placeholder="Enter team name..."
                     value={teamCallsign}
                     onChange={(e) => {
                       setTeamCallsign(e.target.value);
@@ -334,17 +313,18 @@ export const LandingScreen = ({
                     }}
                     className="hero-input"
                     disabled={isSubmitting}
+                    autoComplete="off"
                   />
                 </div>
 
                 <div className="hero-input-group">
                   <label className="hero-input-label">
-                    {authMode === 'signup' ? 'CREATE TEAM PASSCODE' : 'ENTER TEAM PASSCODE'}
+                    PASSWORD
                   </label>
                   <input
                     type="password"
                     id="input-team-passcode"
-                    placeholder="Enter team passcode..."
+                    placeholder="Enter team password..."
                     value={teamPasscode}
                     onChange={(e) => {
                       setTeamPasscode(e.target.value);
@@ -352,6 +332,7 @@ export const LandingScreen = ({
                     }}
                     className="hero-input"
                     disabled={isSubmitting}
+                    autoComplete="current-password"
                   />
                 </div>
               </div>
@@ -374,9 +355,7 @@ export const LandingScreen = ({
                   <span className="btn-enter-protocol__text">
                     {isSubmitting
                       ? 'AUTHENTICATING CLEARANCE...'
-                      : authMode === 'signup'
-                      ? '⚡ REGISTER & ENTER THE PROTOCOL'
-                      : '🔄 RESUME ACTIVE MISSION'}
+                      : '⚡ ACCESS MISSION'}
                   </span>
                   <span className="btn-enter-protocol__arrow">→</span>
                 </button>
