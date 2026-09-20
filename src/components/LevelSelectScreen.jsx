@@ -18,7 +18,7 @@ export const LevelSelectScreen = ({
           <div>
             <span className="eyebrow" style={{ color: 'var(--doom-green)' }}>CAMPAIGN MISSION SELECTOR</span>
             <h2 style={{ margin: '4px 0 0', color: 'var(--doom-text-bright)', letterSpacing: '2px' }}>
-              SELECT LEVEL (2 PARTS · 10 DIFFICULT LEVELS)
+              SELECT LEVEL (2 SESSIONS · 14 CHAMBERS)
             </h2>
           </div>
           <button className="btn btn--ghost btn--sm" onClick={onClose}>✕ CLOSE</button>

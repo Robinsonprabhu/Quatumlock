@@ -25,7 +25,7 @@ export const StageTracker = ({
         }}
         title="Open Level Selection"
       >
-        <span>SESSION {currentPartId} (LEVELS {currentPartId === 1 ? '1–5' : '6–10'})</span>
+        <span>SESSION {currentPartId} (LEVELS {currentPartId === 1 ? '1–7' : '8–14'})</span>
         <span style={{ fontSize: '10px' }}>▼</span>
       </button>
 
@@ -68,7 +68,7 @@ export const StageTracker = ({
                   : `Level ${lvl.id} is LOCKED — Solve Level ${lvl.id - 1} first`
               }
             >
-              LEVEL {lvl.id} {lvl.id === 10 ? '— FINALE' : ''} {isDone ? ' ✓' : isUnlocked ? '' : ' 🔒'}
+              LEVEL {lvl.id} {lvl.id === 14 ? '— FINALE' : ''} {isDone ? ' ✓' : isUnlocked ? '' : ' 🔒'}
             </button>
           );
         })}

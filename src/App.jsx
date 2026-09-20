@@ -63,6 +63,21 @@ export default function App() {
   const hasInitializedQuestionIndexRef = useRef(false);
   const lastSessionNumberRef = useRef(null);
 
+  // Helper to ensure window & container scroll to top immediately
+  const scrollToTop = () => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+      const stageViewport = document.getElementById('stage-viewport');
+      if (stageViewport) stageViewport.scrollTop = 0;
+      const screenGame = document.getElementById('screen-game');
+      if (screenGame) screenGame.scrollTop = 0;
+    } catch (e) {
+      window.scrollTo(0, 0);
+    }
+  };
+
   // Subscribe to narrative engine
   useEffect(() => {
     const unsub = narrativeEngine.subscribe((snapshot) => {
@@ -70,6 +85,11 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  // Ensure every room/stage starts at the top
+  useEffect(() => {
+    scrollToTop();
+  }, [activeQuestionIndex, currentSessionNumber, eventState.status]);
 
   // Global Keyboard Listener: '/' opens command palette, 'Ctrl+Shift+A' opens Admin Auth Prompt
   useEffect(() => {
@@ -748,9 +768,13 @@ export default function App() {
           if (transitionData && typeof transitionData.targetIndex === 'number') {
             setActiveQuestionIndex(transitionData.targetIndex);
           }
+          scrollToTop();
           setTransitioning(false);
           setIsChamberEntering(true);
-          setTimeout(() => setIsChamberEntering(false), 500);
+          setTimeout(() => {
+            scrollToTop();
+            setIsChamberEntering(false);
+          }, 500);
         }}
       />
 
