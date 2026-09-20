@@ -63,6 +63,9 @@ export default function App() {
   const hasInitializedQuestionIndexRef = useRef(false);
   const lastSessionNumberRef = useRef(null);
 
+  const currentQuestion = currentQuestions[activeQuestionIndex] || currentQuestions[0] || null;
+  const currentSessionNumber = eventState.active_session || 1;
+
   // Helper to ensure window & container scroll to top immediately
   const scrollToTop = () => {
     try {
@@ -357,9 +360,6 @@ export default function App() {
     setCurrentQuestions([]);
     setSolvedQuestions([]);
   };
-
-  const currentQuestion = currentQuestions[activeQuestionIndex] || currentQuestions[0] || null;
-  const currentSessionNumber = eventState.active_session || 1;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // ANSWER SUBMISSION VIA REST API
