@@ -24,9 +24,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.text({ limit: '50mb' }));
 
-// MongoDB connects once at startup via onMongoConnect above.
-// No per-request reconnect needed — mongoose handles connection pooling internally.
-// (Vercel serverless: connectMongoDB is idempotent and reuses warm connections)
+// Ensure serverless cold starts trigger connection
+app.use((req, res, next) => {
+  if (!isMongoConnected()) {
+    connectMongoDB().catch(() => {});
+  }
+  next();
+});
 
 // Global body parser error handler
 app.use((err, req, res, next) => {

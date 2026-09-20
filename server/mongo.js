@@ -8,7 +8,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Configurable via .env MONGODB_URI or MONGO_URL (supports Atlas mongodb+srv://)
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://localhost:27017/escaperoom';
+const DEFAULT_ATLAS_URI = 'mongodb+srv://robinson:prabhu2006@escaperoom.obz6qln.mongodb.net/escaperoom?retryWrites=true&w=majority&appName=Escaperoom';
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URL || DEFAULT_ATLAS_URI;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MONGOOSE SCHEMAS & MODELS
