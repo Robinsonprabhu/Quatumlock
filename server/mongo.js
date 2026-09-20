@@ -275,7 +275,7 @@ export async function seedDataToMongo(data) {
     const promises = [];
 
     if (data.event_state) {
-      promises.push(MongoModels.EventState.findOneAndUpdate({}, data.event_state, { upsert: true, new: true }));
+      promises.push(MongoModels.EventState.findOneAndUpdate({}, data.event_state, { upsert: true, returnDocument: 'after' }));
     }
     if (data.questions && data.questions.length > 0) {
       const ops = data.questions.map((q) => ({
@@ -363,7 +363,7 @@ export async function syncToMongo(collectionName, operation, filter, doc) {
     if (!Model) return;
 
     if (operation === 'upsert') {
-      await Model.findOneAndUpdate(filter, doc, { upsert: true, new: true });
+      await Model.findOneAndUpdate(filter, doc, { upsert: true, returnDocument: 'after' });
     } else if (operation === 'insert') {
       await Model.create(doc);
     } else if (operation === 'deleteMany') {
