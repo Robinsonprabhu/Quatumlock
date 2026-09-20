@@ -240,7 +240,7 @@ export default function App() {
 
   useEffect(() => {
     syncServerState();
-    const interval = setInterval(syncServerState, 3000);
+    const interval = setInterval(syncServerState, 2000);
     return () => clearInterval(interval);
   }, [participantToken]);
 

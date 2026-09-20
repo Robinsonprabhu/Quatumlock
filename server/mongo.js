@@ -272,57 +272,86 @@ export async function loadDataFromMongo() {
 export async function seedDataToMongo(data) {
   if (!isMongoConnected() || !data) return;
   try {
+    const promises = [];
+
     if (data.event_state) {
-      await MongoModels.EventState.findOneAndUpdate({}, data.event_state, { upsert: true, new: true });
+      promises.push(MongoModels.EventState.findOneAndUpdate({}, data.event_state, { upsert: true, new: true }));
     }
     if (data.questions && data.questions.length > 0) {
-      for (const q of data.questions) {
-        await MongoModels.Question.findOneAndUpdate({ id: q.id }, q, { upsert: true });
-      }
+      const ops = data.questions.map((q) => ({
+        updateOne: { filter: { id: q.id }, update: { $set: q }, upsert: true }
+      }));
+      promises.push(MongoModels.Question.bulkWrite(ops));
     }
     if (data.participants) {
-      for (const p of Object.values(data.participants)) {
-        await MongoModels.Participant.findOneAndUpdate({ id: p.id }, {
-          id: p.id,
-          teamName: p.teamName,
-          passcode: p.teamPassword || '',
-          token: p.token,
-          registeredAt: p.registeredAt,
-          lastActiveAt: p.lastActiveAt
-        }, { upsert: true });
+      const pList = Object.values(data.participants);
+      if (pList.length > 0) {
+        const ops = pList.map((p) => ({
+          updateOne: {
+            filter: { id: p.id },
+            update: {
+              $set: {
+                id: p.id,
+                teamName: p.teamName,
+                passcode: p.teamPassword || '',
+                token: p.token,
+                registeredAt: p.registeredAt,
+                lastActiveAt: p.lastActiveAt
+              }
+            },
+            upsert: true
+          }
+        }));
+        promises.push(MongoModels.Participant.bulkWrite(ops));
       }
     }
     if (data.question_assignments) {
-      for (const arr of Object.values(data.question_assignments)) {
-        for (const a of arr) {
-          await MongoModels.QuestionAssignment.findOneAndUpdate({ assignmentId: a.assignmentId }, a, { upsert: true });
-        }
+      const allAssignments = Object.values(data.question_assignments).flat();
+      if (allAssignments.length > 0) {
+        const ops = allAssignments.map((a) => ({
+          updateOne: { filter: { assignmentId: a.assignmentId }, update: { $set: a }, upsert: true }
+        }));
+        promises.push(MongoModels.QuestionAssignment.bulkWrite(ops));
       }
     }
     if (data.answers && data.answers.length > 0) {
-      for (const ans of data.answers) {
-        await MongoModels.Answer.findOneAndUpdate({ answerId: ans.answerId }, ans, { upsert: true });
-      }
+      const ops = data.answers.map((ans) => ({
+        updateOne: { filter: { answerId: ans.answerId }, update: { $set: ans }, upsert: true }
+      }));
+      promises.push(MongoModels.Answer.bulkWrite(ops));
     }
     if (data.participant_sessions) {
-      for (const [pId, sess] of Object.entries(data.participant_sessions)) {
-        await MongoModels.ParticipantSession.findOneAndUpdate({ participantId: pId }, sess, { upsert: true });
+      const entries = Object.entries(data.participant_sessions);
+      if (entries.length > 0) {
+        const ops = entries.map(([pId, sess]) => ({
+          updateOne: { filter: { participantId: pId }, update: { $set: sess }, upsert: true }
+        }));
+        promises.push(MongoModels.ParticipantSession.bulkWrite(ops));
       }
     }
     if (data.hints_used) {
+      const hintsList = [];
       for (const [pId, hints] of Object.entries(data.hints_used)) {
         for (const h of hints) {
-          await MongoModels.HintUsed.findOneAndUpdate(
-            { participantId: pId, questionId: h.questionId, hintIdx: h.hintIdx },
-            { ...h, participantId: pId },
-            { upsert: true }
-          );
+          hintsList.push({ ...h, participantId: pId });
         }
       }
+      if (hintsList.length > 0) {
+        const ops = hintsList.map((h) => ({
+          updateOne: {
+            filter: { participantId: h.participantId, questionId: h.questionId, hintIdx: h.hintIdx },
+            update: { $set: h },
+            upsert: true
+          }
+        }));
+        promises.push(MongoModels.HintUsed.bulkWrite(ops));
+      }
     }
-    console.log('[MongoDB] ✅ Full state successfully backed up & synchronized to MongoDB.');
+
+    await Promise.all(promises);
+    console.log('[MongoDB] ✅ State synchronized to MongoDB Atlas in real-time.');
   } catch (err) {
-    console.warn('[MongoDB] Error seeding state to Mongo:', err.message);
+    console.warn('[MongoDB] Error syncing state to Mongo:', err.message);
   }
 }
 

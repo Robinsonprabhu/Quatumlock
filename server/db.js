@@ -1372,15 +1372,27 @@ function loadDb() {
   }
 }
 
-// Dirty flag — set whenever local state changes, cleared after a successful Mongo sync
-let _dirty = false;
+// Instant sync trigger with micro-throttle (50ms) to coalesce rapid synchronous writes
+let _syncTimer = null;
+function triggerInstantMongoSync() {
+  if (_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    try {
+      if (isMongoConnected()) {
+        await seedDataToMongo(db);
+      }
+    } catch (e) {
+      // Non-blocking
+    }
+  }, 50);
+}
 
-// Safe persistent save to disk
+// Safe persistent save to disk + immediate MongoDB push
 function saveDb() {
   try {
     const json = JSON.stringify(db, null, 2);
     fs.writeFileSync(DB_FILE, json, 'utf8');
-    _dirty = true; // mark for next Mongo sync
+    triggerInstantMongoSync();
   } catch (err) {
     console.error('[DB] Failed to save database file:', err);
   }
@@ -1388,23 +1400,16 @@ function saveDb() {
 
 loadDb();
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PERIODIC AUTO-SYNC: Push local state to MongoDB only when data has changed.
-// Uses a dirty flag to skip redundant writes and avoid Atlas rate-limit drops.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// Periodic background sanity check (heartbeat sync)
 setInterval(async () => {
   try {
-    if (!isMongoConnected() || !_dirty) return;
-    _dirty = false; // clear before sync so concurrent writes re-set it
-    await seedDataToMongo(db);
-    console.log('[DB] 🔄 Periodic auto-sync → MongoDB Atlas complete.');
+    if (isMongoConnected()) {
+      await seedDataToMongo(db);
+    }
   } catch (e) {
-    _dirty = true; // re-set dirty so it retries next interval
-    // silent — never block app
+    // Non-blocking
   }
-}, 90_000);
+}, 30_000);
 
 
 // ─────────────────────────────────────────────────────────────────────────────

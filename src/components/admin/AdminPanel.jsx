@@ -140,7 +140,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
     const interval = setInterval(() => {
       fetchAdminProgress();
       fetchMongoStatus();
-    }, 3000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [isOpen, adminToken]);
 
