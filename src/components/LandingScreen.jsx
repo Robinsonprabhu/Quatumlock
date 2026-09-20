@@ -17,11 +17,8 @@ export const LandingScreen = ({
   // Cinematic opening sequence stages: 0 to 5
   // 0: Black screen (0.0s)
   // 1: Green sparks/particles (0.5s)
-  // 2: Image fade & subtle zoom (1.0s)
-  // 3: Light sweep & character visible (2.0s)
-  // 4: AIDEX'26 title & subtitle (3.0s)
-  // 5: Form, description, CTA ready (4.0s)
-  const [introStage, setIntroStage] = useState(0);
+  // Cinematic opening sequence stages: default 5 for immediate high-impact render
+  const [introStage, setIntroStage] = useState(5);
 
   // Mouse Parallax offset
   const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
