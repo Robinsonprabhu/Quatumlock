@@ -1404,31 +1404,39 @@ loadDb();
 // DATABASE ACCESS METHODS
 // ─────────────────────────────────────────────────────────────────────────────
 
+let _lastMongoFetch = 0;
+
 export const Database = {
-  // --- MONGODB TWO-WAY INITIALIZATION ---
+  // --- MONGODB TWO-WAY INITIALIZATION & REAL-TIME REFRESH ---
   async syncWithMongo() {
+    return this.refreshFromMongo(true);
+  },
+
+  async refreshFromMongo(force = false) {
+    const now = Date.now();
+    if (!force && (now - _lastMongoFetch < 500)) {
+      return true; // use ultra-fresh state
+    }
+    if (!isMongoConnected()) return false;
     try {
       const mongoData = await loadDataFromMongo();
       if (mongoData && mongoData.questions && mongoData.questions.length > 0) {
         db = {
-          ...db,
-          ...mongoData,
           event_state: mongoData.event_state || db.event_state,
           questions: (mongoData.questions && mongoData.questions.length >= 14) ? mongoData.questions : db.questions,
-          participants: { ...(db.participants || {}), ...(mongoData.participants || {}) },
-          answers: (mongoData.answers && mongoData.answers.length > (db.answers || []).length) ? mongoData.answers : (db.answers || []),
-          participant_sessions: { ...(db.participant_sessions || {}), ...(mongoData.participant_sessions || {}) },
-          hints_used: { ...(db.hints_used || {}), ...(mongoData.hints_used || {}) }
+          participants: mongoData.participants || {},
+          question_assignments: mongoData.question_assignments || {},
+          answers: mongoData.answers || [],
+          participant_sessions: mongoData.participant_sessions || {},
+          hints_used: mongoData.hints_used || {}
         };
-        saveDb();
-        console.log(`[DB] ✅ Synced state from MongoDB (${Object.keys(db.participants || {}).length} teams, ${db.questions.length} questions).`);
-      } else {
+        _lastMongoFetch = now;
+      } else if (mongoData) {
         await seedDataToMongo(db);
-        console.log('[DB] ✅ Seeded initial questions, event state, and participants to MongoDB.');
+        _lastMongoFetch = now;
       }
       return true;
     } catch (err) {
-      console.warn('[DB] MongoDB sync note:', err.message);
       return false;
     }
   },

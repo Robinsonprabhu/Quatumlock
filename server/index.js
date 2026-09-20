@@ -24,10 +24,15 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.text({ limit: '50mb' }));
 
-// Ensure serverless cold starts trigger connection
-app.use((req, res, next) => {
-  if (!isMongoConnected()) {
-    connectMongoDB().catch(() => {});
+// Ensure MongoDB connection and authoritative state sync on EVERY request
+app.use(async (req, res, next) => {
+  try {
+    if (!isMongoConnected()) {
+      await connectMongoDB();
+    }
+    await Database.refreshFromMongo();
+  } catch (err) {
+    // Non-blocking fallback
   }
   next();
 });
