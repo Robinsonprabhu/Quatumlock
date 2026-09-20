@@ -417,9 +417,9 @@ export default function App() {
 
         narrativeEngine.onCorrectAnswer(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0)}`);
 
-        // Use updatedSolved (freshly computed) — not solvedQuestions state (may be one render stale)
+        // Use updatedSolved (freshly computed) — only complete when all 7 questions are solved
         const currentSessionSolvedCount = currentQuestions.filter((q) => updatedSolved.includes(q.id)).length;
-        if (currentSessionSolvedCount >= currentQuestions.length) {
+        if (currentQuestions.length >= 7 && currentSessionSolvedCount >= currentQuestions.length) {
           triggerRoomTransition(activeQuestionIndex, { isSessionComplete: true });
           // Complete session on backend
           await fetch(`/api/session/${currentSessionNumber}/complete`, {
@@ -457,11 +457,8 @@ export default function App() {
       if (current.includes(hintIdx)) return prev;
       return { ...prev, [stageKey]: [...current, hintIdx] };
     });
-    
-    // Deduct remaining time immediately on client
-    const numPenalty = Number(penalty) || 20;
-    setRemainingTime((prev) => Math.max(0, prev - numPenalty));
 
+    const numPenalty = Number(penalty) || 20;
     narrativeEngine.onHintUsed(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0)}`);
 
     // Authoritative server-side hint recording & point deduction
@@ -479,11 +476,6 @@ export default function App() {
         })
       })
         .then((res) => res.json())
-        .then((data) => {
-          if (data && data.remainingSeconds !== undefined) {
-            setRemainingTime(data.remainingSeconds);
-          }
-        })
         .catch((err) => console.warn('[Hint] Server sync error:', err));
     }
   };

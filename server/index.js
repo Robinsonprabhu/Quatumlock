@@ -466,7 +466,7 @@ app.post('/api/admin/session/open', adminAuth, (req, res) => {
   const { session = 1, durationMinutes } = req.body;
   const targetStatus = Number(session) === 2 ? 'SESSION_2_ACTIVE' : 'SESSION_1_ACTIVE';
   try {
-    const updatedState = Database.updateEventState(targetStatus, { durationMinutes });
+    const updatedState = Database.updateEventState(targetStatus, { durationMinutes, resetTimer: true });
 
     // Ensure every registered participant has their question assignments.
     // This fixes blank page when participants registered before/during a session start.

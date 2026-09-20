@@ -1471,11 +1471,10 @@ export const Database = {
     if (startedAt && (state.status === 'SESSION_1_ACTIVE' || state.status === 'SESSION_2_ACTIVE')) {
       const effectiveNow = (state.timer_paused && state.timer_paused_at) ? state.timer_paused_at : now;
       const elapsedSec = Math.max(0, Math.floor((effectiveNow - startedAt) / 1000));
-      const effectiveAllowedSec = Math.max(0, baseAllowedSec - participantHintPenaltySec);
-      sessionRemainingSec = Math.max(0, effectiveAllowedSec - elapsedSec);
+      sessionRemainingSec = Math.max(0, baseAllowedSec - elapsedSec);
       if (sessionRemainingSec <= 0) isExpired = true;
     } else {
-      sessionRemainingSec = Math.max(0, baseAllowedSec - participantHintPenaltySec);
+      sessionRemainingSec = baseAllowedSec;
     }
 
     return {
@@ -2046,21 +2045,13 @@ export const Database = {
       throw new Error(`CHAMBER LOCKED: Session ${sessionNumber} is currently not accepting submissions.`);
     }
 
-    // Check if session countdown timer has expired (taking into account hint penalties)
+    // Check if session countdown timer has expired
     const startedAt = db.event_state[`session${sessionNumber}_started_at`];
     const durationMin = db.event_state.session_duration_minutes || 30;
     const timeAdjSec = db.event_state.time_adjustment_seconds || 0;
     const baseAllowedSec = durationMin * 60 + timeAdjSec;
 
-    const participantHints = (db.hints_used && db.hints_used[participantId]) || [];
-    const allAssignments = db.question_assignments[participantId] || [];
-    const sessionQIds = new Set(allAssignments.filter(a => a.sessionNumber === sessionNumber).map(a => a.questionId));
-    const sessionHintPenaltySec = participantHints
-      .filter(h => sessionQIds.has(h.questionId))
-      .reduce((sum, h) => sum + (Number(h.penalty) || 20), 0);
-
-    const effectiveAllowedMs = Math.max(0, (baseAllowedSec - sessionHintPenaltySec)) * 1000;
-    if (startedAt && (Date.now() - startedAt) > effectiveAllowedMs) {
+    if (startedAt && (Date.now() - startedAt) > (baseAllowedSec * 1000)) {
       throw new Error('COUNTDOWN EXPIRED: The session timer has ended. Chamber inputs are locked.');
     }
 
