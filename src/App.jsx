@@ -140,9 +140,20 @@ export default function App() {
           setTeamName(data.participant.teamName);
           setSessionStats(data.sessionStats || {});
 
+          // Only sync remaining time from server on transition events (session start/lock/end).
+          // During an active session the local 1-second countdown provides smooth UX.
+          // Server correction still applies: if server says < local, reconcile down.
           if (data.eventState?.session_remaining_seconds !== undefined) {
-            setRemainingTime(data.eventState.session_remaining_seconds);
-            if (data.eventState.session_remaining_seconds > 0) {
+            const serverSecs = data.eventState.session_remaining_seconds;
+            const isActive = data.eventState.status === 'SESSION_1_ACTIVE' || data.eventState.status === 'SESSION_2_ACTIVE';
+            setRemainingTime((prev) => {
+              // Always accept server time if session is not active (paused, locked, etc.)
+              if (!isActive || data.eventState.timer_paused) return serverSecs;
+              // If server is more than 5s behind local, reconcile (server is authoritative)
+              if (Math.abs(prev - serverSecs) > 5) return serverSecs;
+              return prev; // otherwise keep smooth local countdown
+            });
+            if (serverSecs > 0) {
               setFailureModalDismissed(false);
             }
           }
@@ -177,8 +188,8 @@ export default function App() {
                 return [...prev, ...newItems];
               });
             }
-            
-            // Adjust activeQuestionIndex: ONLY on initial sync, refresh, or when active session transitions
+
+            // Adjust activeQuestionIndex ONLY on initial sync or session change — never during polling
             const currentSess = data.sessionNumber || data.eventState?.active_session || 1;
             if (!hasInitializedQuestionIndexRef.current || lastSessionNumberRef.current !== currentSess) {
               const firstUnsolved = data.questions.findIndex((q) => !q.isSolved);
@@ -373,8 +384,8 @@ export default function App() {
 
         narrativeEngine.onCorrectAnswer(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0)}`);
 
-        // Check if all 7 questions for current session are solved
-        const currentSessionSolvedCount = currentQuestions.filter((q) => q.id === currentQuestion.id || solvedQuestions.includes(q.id)).length;
+        // Use updatedSolved (freshly computed) — not solvedQuestions state (may be one render stale)
+        const currentSessionSolvedCount = currentQuestions.filter((q) => updatedSolved.includes(q.id)).length;
         if (currentSessionSolvedCount >= currentQuestions.length) {
           triggerRoomTransition(activeQuestionIndex, { isSessionComplete: true });
           // Complete session on backend
@@ -497,14 +508,14 @@ export default function App() {
     );
   }
 
-  // Gate 2: Waiting Room when event is CLOSED, SESSION_1_LOCKED, SESSION_2_LOCKED, or EVENT_FINISHED
+  // Gate 2: Waiting Room only for admin-controlled closed/locked states.
+  // Do NOT send to WaitingRoom just because session is expired or all solved —
+  // FailureModal and the in-game locked overlay handle those cases.
   const isWaitingRoomState = (
     eventState.status === 'CLOSED' ||
     eventState.status === 'SESSION_1_LOCKED' ||
     eventState.status === 'SESSION_2_LOCKED' ||
-    eventState.status === 'EVENT_FINISHED' ||
-    (eventState.status === 'SESSION_1_ACTIVE' && sessionStats.session1Completed) ||
-    (eventState.status === 'SESSION_2_ACTIVE' && sessionStats.session2Completed)
+    eventState.status === 'EVENT_FINISHED'
   );
 
   const displayLevelNumber = activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0);

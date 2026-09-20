@@ -1372,11 +1372,15 @@ function loadDb() {
   }
 }
 
+// Dirty flag — set whenever local state changes, cleared after a successful Mongo sync
+let _dirty = false;
+
 // Safe persistent save to disk
 function saveDb() {
   try {
     const json = JSON.stringify(db, null, 2);
     fs.writeFileSync(DB_FILE, json, 'utf8');
+    _dirty = true; // mark for next Mongo sync
   } catch (err) {
     console.error('[DB] Failed to save database file:', err);
   }
@@ -1386,19 +1390,21 @@ loadDb();
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PERIODIC AUTO-SYNC: Push all local state to MongoDB every 60 seconds
-// Ensures Atlas is always up-to-date even if a per-write sync was missed
+// PERIODIC AUTO-SYNC: Push local state to MongoDB only when data has changed.
+// Uses a dirty flag to skip redundant writes and avoid Atlas rate-limit drops.
 // ─────────────────────────────────────────────────────────────────────────────
 
 setInterval(async () => {
   try {
-    if (!isMongoConnected()) return;
+    if (!isMongoConnected() || !_dirty) return;
+    _dirty = false; // clear before sync so concurrent writes re-set it
     await seedDataToMongo(db);
     console.log('[DB] 🔄 Periodic auto-sync → MongoDB Atlas complete.');
   } catch (e) {
+    _dirty = true; // re-set dirty so it retries next interval
     // silent — never block app
   }
-}, 60_000);
+}, 90_000);
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1894,8 +1900,14 @@ export const Database = {
 
   // Per-Participant Random Question Generator (14 unique questions: 7 in S1, 7 in S2)
   generateRandomQuestionsForParticipant(participantId) {
-    if (db.question_assignments[participantId]) {
-      return db.question_assignments[participantId];
+    // Only skip generation if assignments are complete (14 total: 7 per session).
+    // A partial set (e.g. after a bad sync) must be regenerated.
+    const existing = db.question_assignments[participantId] || [];
+    if (existing.length >= 14) {
+      return existing;
+    }
+    if (existing.length > 0) {
+      console.warn(`[DB] Participant ${participantId} had incomplete assignments (${existing.length}/14) — regenerating.`);
     }
 
     const enabledPool = db.questions.filter((q) => q.enabled !== false);

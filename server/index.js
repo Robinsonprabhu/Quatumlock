@@ -24,15 +24,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.text({ limit: '50mb' }));
 
-// Ensure MongoDB is connected on every API request (critical for Vercel serverless cold starts)
-app.use('/api', async (req, res, next) => {
-  try {
-    await connectMongoDB();
-  } catch (e) {
-    // non-fatal: fallback to local JSON db
-  }
-  next();
-});
+// MongoDB connects once at startup via onMongoConnect above.
+// No per-request reconnect needed — mongoose handles connection pooling internally.
+// (Vercel serverless: connectMongoDB is idempotent and reuses warm connections)
 
 // Global body parser error handler
 app.use((err, req, res, next) => {
@@ -223,18 +217,37 @@ app.get('/api/participant/profile', participantAuth, (req, res) => {
   });
 });
 
-// Restore participant profile & state
+// Restore participant profile & state — single source of truth for the frontend
 app.get('/api/participant/state', participantAuth, (req, res) => {
   const participant = req.participant;
   const eventState = Database.getEventState(participant.id);
   const sessionNum = eventState.active_session || 1;
 
-  const currentQuestions = (eventState.status === 'SESSION_1_ACTIVE' || eventState.status === 'SESSION_2_ACTIVE')
+  const isSessionActive = eventState.status === 'SESSION_1_ACTIVE' || eventState.status === 'SESSION_2_ACTIVE';
+  const currentQuestions = isSessionActive
     ? Database.getParticipantQuestionsForSession(participant.id, sessionNum)
     : [];
 
-  const sessions = Database.getAdminProgress().participants.find((p) => p.id === participant.id) || {};
   const hints = Database.getParticipantHints(participant.id);
+
+  // Compute sessionStats directly from answer records (authoritative, not the pSession.completed flag)
+  const rawDb = Database.getRawDb();
+  const pSession = (rawDb.participant_sessions || {})[participant.id] || {};
+  const answers = (rawDb.answers || []).filter(a => a.participantId === participant.id && a.isCorrect);
+  const s1Assignments = (rawDb.question_assignments?.[participant.id] || []).filter(a => a.sessionNumber === 1);
+  const s2Assignments = (rawDb.question_assignments?.[participant.id] || []).filter(a => a.sessionNumber === 2);
+  const s1SolvedCount = answers.filter(a => s1Assignments.some(x => x.questionId === a.questionId)).length;
+  const s2SolvedCount = answers.filter(a => s2Assignments.some(x => x.questionId === a.questionId)).length;
+
+  const sessionStats = {
+    ...pSession,
+    session1Completed: s1Assignments.length > 0 && s1SolvedCount >= s1Assignments.length,
+    session2Completed: s2Assignments.length > 0 && s2SolvedCount >= s2Assignments.length,
+    s1SolvedCount,
+    s2SolvedCount,
+    s1Total: s1Assignments.length,
+    s2Total: s2Assignments.length
+  };
 
   res.json({
     success: true,
@@ -246,8 +259,39 @@ app.get('/api/participant/state', participantAuth, (req, res) => {
     sessionNumber: sessionNum,
     questions: currentQuestions,
     hintsUsed: hints,
-    sessionStats: sessions
+    sessionStats
   });
+});
+
+// Register-or-Login: single unified endpoint for participants
+// Tries to register; if team already exists, falls back to login with provided password.
+app.post('/api/participant/join', (req, res) => {
+  try {
+    const { teamName, passcode, teamPassword } = req.body;
+    if (!teamName || !String(teamName).trim()) {
+      return res.status(400).json({ error: 'MISSING_NAME', message: 'Team callsign is required.' });
+    }
+    const pass = teamPassword || passcode || '';
+    let participant;
+    try {
+      participant = Database.registerParticipant(teamName, pass);
+    } catch (registerErr) {
+      // Team exists — try login instead
+      try {
+        participant = Database.loginParticipant(teamName, pass);
+      } catch (loginErr) {
+        return res.status(401).json({ error: 'AUTH_FAILED', message: loginErr.message });
+      }
+    }
+    const eventState = Database.getEventState();
+    return res.json({
+      success: true,
+      participant: { id: participant.id, teamName: participant.teamName, token: participant.token },
+      eventState
+    });
+  } catch (err) {
+    return res.status(400).json({ error: 'JOIN_FAILED', message: err.message });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -408,15 +452,34 @@ app.post('/api/admin/event/adjust-time', adminAuth, (req, res) => {
 });
 
 // Admin Session Open (Session 1 or 2)
+// Also ensures all registered participants have their question assignments.
 app.post('/api/admin/session/open', adminAuth, (req, res) => {
   const { session = 1, durationMinutes } = req.body;
   const targetStatus = Number(session) === 2 ? 'SESSION_2_ACTIVE' : 'SESSION_1_ACTIVE';
   try {
     const updatedState = Database.updateEventState(targetStatus, { durationMinutes });
+
+    // Ensure every registered participant has their question assignments.
+    // This fixes blank page when participants registered before/during a session start.
+    const rawDb = Database.getRawDb();
+    const participantIds = Object.keys(rawDb.participants || {});
+    let assignedCount = 0;
+    for (const pid of participantIds) {
+      const existing = (rawDb.question_assignments || {})[pid] || [];
+      if (existing.length < 14) {
+        Database.generateRandomQuestionsForParticipant(pid);
+        assignedCount++;
+      }
+    }
+    if (assignedCount > 0) {
+      console.log(`[Admin] Auto-assigned questions to ${assignedCount} participant(s) on session open.`);
+    }
+
     res.json({
       success: true,
       sessionOpened: Number(session),
-      eventState: updatedState
+      eventState: updatedState,
+      participantsAssigned: assignedCount
     });
   } catch (err) {
     res.status(400).json({ error: 'OPEN_SESSION_FAILED', message: err.message });
