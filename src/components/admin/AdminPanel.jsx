@@ -137,11 +137,27 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
     fetchAdminProgress();
     fetchQuestionBank();
     fetchMongoStatus();
-    const interval = setInterval(() => {
-      fetchAdminProgress();
-      fetchMongoStatus();
-    }, 2000);
-    return () => clearInterval(interval);
+
+    // Listen to real-time events for instant admin dashboard updates
+    let eventSource = null;
+    try {
+      eventSource = new EventSource('/api/events/stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.type) {
+            fetchAdminProgress();
+            fetchMongoStatus();
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
   }, [isOpen, adminToken]);
 
   useEffect(() => {

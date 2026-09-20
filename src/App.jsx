@@ -28,6 +28,7 @@ import { PuzzleCard } from './components/widgets/PuzzleCard';
 
 import { narrativeEngine } from './engine/narrativeEngine';
 import { SoundManager } from './utils/soundManager';
+import { timerSynchronizer } from './utils/timerSync';
 
 const TOKEN_KEY = 'AIDEX_PARTICIPANT_TOKEN_V1';
 const TEAM_NAME_KEY = 'AIDEX_TEAM_NAME_V1';
@@ -157,7 +158,7 @@ export default function App() {
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SERVER STATE SYNCHRONIZATION POLLING
+  // SERVER STATE SYNCHRONIZATION (INITIAL LOAD, REFRESH & SSE STREAM)
   // ─────────────────────────────────────────────────────────────────────────────
   const syncServerState = async () => {
     try {
@@ -175,24 +176,8 @@ export default function App() {
           setEventState(data.eventState);
           setTeamName(data.participant.teamName);
           setSessionStats(data.sessionStats || {});
-
-          // Only sync remaining time from server on transition events (session start/lock/end).
-          // During an active session the local 1-second countdown provides smooth UX.
-          // Server correction still applies: if server says < local, reconcile down.
-          if (data.eventState?.session_remaining_seconds !== undefined) {
-            const serverSecs = data.eventState.session_remaining_seconds;
-            const isActive = data.eventState.status === 'SESSION_1_ACTIVE' || data.eventState.status === 'SESSION_2_ACTIVE';
-            setRemainingTime((prev) => {
-              // Always accept server time if session is not active (paused, locked, etc.)
-              if (!isActive || data.eventState.timer_paused) return serverSecs;
-              // If server is more than 5s behind local, reconcile (server is authoritative)
-              if (Math.abs(prev - serverSecs) > 5) return serverSecs;
-              return prev; // otherwise keep smooth local countdown
-            });
-            if (serverSecs > 0) {
-              setFailureModalDismissed(false);
-            }
-          }
+          timerSynchronizer.syncServerState(data.eventState);
+          setRemainingTime(timerSynchronizer.getRemainingSeconds());
 
           if (data.hintsUsed && Array.isArray(data.hintsUsed)) {
             const mapped = {};
@@ -209,7 +194,7 @@ export default function App() {
             const solved = data.questions.filter((q) => q.isSolved).map((q) => q.id);
             setSolvedQuestions((prev) => Array.from(new Set([...prev, ...solved])));
 
-            // Rebuild evidence list from all solved questions so returning teams retain dossier
+            // Rebuild evidence list from all solved questions
             const solvedEvidence = data.questions
               .filter((q) => q.isSolved && q.evidenceTitle)
               .map((q) => ({
@@ -225,7 +210,7 @@ export default function App() {
               });
             }
 
-            // Adjust activeQuestionIndex ONLY on initial sync or session change — never during polling
+            // Set active question on initial load / session change
             const currentSess = data.sessionNumber || data.eventState?.active_session || 1;
             if (!hasInitializedQuestionIndexRef.current || lastSessionNumberRef.current !== currentSess) {
               const firstUnsolved = data.questions.findIndex((q) => !q.isSolved);
@@ -244,47 +229,88 @@ export default function App() {
         const data = await res.json();
         if (data && data.eventState) {
           setEventState(data.eventState);
-          if (data.eventState.session_remaining_seconds !== undefined) {
-            setRemainingTime(data.eventState.session_remaining_seconds);
-          }
+          timerSynchronizer.syncServerState(data.eventState);
+          setRemainingTime(timerSynchronizer.getRemainingSeconds());
         }
       }
     } catch (err) {
-      console.warn('[App] Server synchronization error:', err);
+      console.warn('[App] Server synchronization notice:', err);
     }
   };
 
+  // Connect to Real-Time SSE Stream for instant Admin Events (No Polling Loops!)
   useEffect(() => {
+    // Initial authoritative fetch on load / refresh / token change
     syncServerState();
-    const interval = setInterval(syncServerState, 2000);
-    return () => clearInterval(interval);
+
+    let eventSource = null;
+    try {
+      eventSource = new EventSource('/api/events/stream');
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.type) {
+            if (
+              data.type === 'SESSION_OPENED' ||
+              data.type === 'SESSION_LOCKED' ||
+              data.type === 'TIMER_ADJUSTED' ||
+              data.type === 'EVENT_STATE_CHANGED' ||
+              data.type === 'INIT_STATE'
+            ) {
+              const newEventState = data.payload?.eventState || data.payload;
+              if (newEventState) {
+                setEventState(newEventState);
+                timerSynchronizer.syncServerState(newEventState);
+                setRemainingTime(timerSynchronizer.getRemainingSeconds());
+              }
+              if (participantToken) {
+                syncServerState();
+              }
+            } else if (data.type === 'EVENT_RESET') {
+              setEventState(data.payload);
+              timerSynchronizer.syncServerState(data.payload);
+              setRemainingTime(timerSynchronizer.getRemainingSeconds());
+              if (participantToken) {
+                syncServerState();
+              }
+            } else if (data.type === 'LEADERBOARD_UPDATED') {
+              // Update stats on leaderboard event
+              if (participantToken) {
+                fetch('/api/participant/state', { headers: { 'x-participant-token': participantToken } })
+                  .then((r) => r.json())
+                  .then((d) => { if (d && d.success) setSessionStats(d.sessionStats || {}); })
+                  .catch(() => {});
+              }
+            }
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
   }, [participantToken]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // AUTHORITATIVE SERVER TIMER EFFECT
+  // PURE LOCAL 1-SECOND TIMER COUNTDOWN (DERIVED FROM SERVER sessionEndTime)
+  // ZERO DATABASE POLLING REQUIRED!
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const isSessionActive = (eventState.status === 'SESSION_1_ACTIVE' || eventState.status === 'SESSION_2_ACTIVE');
+    timerSynchronizer.syncServerState(eventState);
 
-    if (!isSessionActive) {
-      if (eventState.session_remaining_seconds !== undefined) {
-        setRemainingTime(eventState.session_remaining_seconds);
+    const updateCountdown = () => {
+      const remaining = timerSynchronizer.getRemainingSeconds();
+      setRemainingTime(remaining);
+      if (remaining > 0) {
+        setFailureModalDismissed(false);
       }
-      return;
-    }
+    };
 
-    if (eventState.timer_paused) return;
-
-    // Smooth local 1-second countdown, authoritative reconciled via syncServerState
-    const timer = setInterval(() => {
-      setRemainingTime((prev) => {
-        if (prev <= 0) return 0;
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [eventState.status, eventState.timer_paused, eventState.active_session]);
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [eventState.status, eventState.session_end_time, eventState.timer_paused, eventState.active_session]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // PARTICIPANT REGISTRATION & LOGIN (WITH PASSCODE & RESTORE STATE)

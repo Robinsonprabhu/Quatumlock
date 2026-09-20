@@ -103,9 +103,15 @@ export const Database = {
       sessionRemainingSec = baseAllowedSec;
     }
 
+    const sessionStartTime = startedAt || null;
+    const sessionEndTime = startedAt ? (startedAt + (baseAllowedSec * 1000)) : null;
+
     return {
       ...state,
       active_session: activeSession,
+      session_start_time: sessionStartTime,
+      session_end_time: sessionEndTime,
+      session_duration_minutes: durationMinutes,
       session_remaining_seconds: sessionRemainingSec,
       participant_hint_penalty_seconds: participantHintPenaltySec,
       is_expired: isExpired,

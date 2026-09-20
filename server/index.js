@@ -13,6 +13,20 @@ const app = express();
 const DEFAULT_PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_PASSKEY || 'robin123';
 
+// Real-Time Server-Sent Events (SSE) Client Registry
+const sseClients = new Set();
+
+export function broadcastEvent(eventType, payload = {}) {
+  const dataString = `data: ${JSON.stringify({ type: eventType, payload, timestamp: Date.now() })}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.res.write(dataString);
+    } catch (err) {
+      sseClients.delete(client);
+    }
+  }
+}
+
 // Initialize MongoDB Connection on server launch
 connectMongoDB().then(() => {
   initializeDatabase();
@@ -52,6 +66,41 @@ app.use((err, req, res, next) => {
     });
   }
   next(err);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REAL-TIME SERVER-SENT EVENTS (SSE) STREAM
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/events/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (res.flushHeaders) res.flushHeaders();
+
+  const client = { res, id: Date.now() + Math.random() };
+  sseClients.add(client);
+
+  // Send initial authoritative state immediately upon connection
+  try {
+    const state = await Database.getEventState();
+    res.write(`data: ${JSON.stringify({ type: 'INIT_STATE', payload: state, timestamp: Date.now() })}\n\n`);
+  } catch (e) {}
+
+  // Keep-alive heartbeat every 25 seconds
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`: heartbeat ${Date.now()}\n\n`);
+    } catch (e) {
+      clearInterval(heartbeat);
+      sseClients.delete(client);
+    }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(client);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,6 +189,8 @@ app.post('/api/participant/register', async (req, res) => {
     const participant = await Database.registerParticipant(teamName, pass);
     const eventState = await Database.getEventState();
 
+    broadcastEvent('PARTICIPANT_REGISTERED', { teamName: participant.teamName });
+
     res.json({
       success: true,
       participant: {
@@ -207,6 +258,7 @@ app.post('/api/auth/login', async (req, res) => {
       const pass = teamPassword || passcode || '';
       const participant = await Database.registerParticipant(teamName, pass);
       const eventState = await Database.getEventState();
+      broadcastEvent('PARTICIPANT_REGISTERED', { teamName: participant.teamName });
       return res.json({
         success: true,
         participant: {
@@ -286,6 +338,7 @@ app.post('/api/participant/join', async (req, res) => {
     let participant;
     try {
       participant = await Database.registerParticipant(teamName, pass);
+      broadcastEvent('PARTICIPANT_REGISTERED', { teamName: participant.teamName });
     } catch (registerErr) {
       try {
         participant = await Database.loginParticipant(teamName, pass);
@@ -362,6 +415,9 @@ const handleAnswerSubmission = async (req, res) => {
 
   try {
     const result = await Database.submitAnswer(req.participant.id, questionId, sessionNum, answer);
+    if (result.isCorrect) {
+      broadcastEvent('LEADERBOARD_UPDATED', { participantId: req.participant.id });
+    }
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: 'SUBMISSION_FAILED', message: err.message });
@@ -396,6 +452,7 @@ app.post('/api/session/:sessionNum/complete', participantAuth, async (req, res) 
   const sessionNum = parseInt(req.params.sessionNum, 10);
   try {
     const sessionSummary = await Database.completeSession(req.participant.id, sessionNum);
+    broadcastEvent('LEADERBOARD_UPDATED', { participantId: req.participant.id });
     res.json({
       success: true,
       sessionSummary
@@ -448,6 +505,7 @@ app.post('/api/admin/event/state', adminAuth, async (req, res) => {
   const { status, durationMinutes } = req.body;
   try {
     const updatedState = await Database.updateEventState(status, { durationMinutes });
+    broadcastEvent('EVENT_STATE_CHANGED', updatedState);
     res.json({
       success: true,
       eventState: updatedState
@@ -462,6 +520,7 @@ app.post('/api/admin/event/adjust-time', adminAuth, async (req, res) => {
   const { minutes, durationMinutes, action } = req.body;
   try {
     const updatedState = await Database.adjustEventTime({ minutes, durationMinutes, action });
+    broadcastEvent('TIMER_ADJUSTED', updatedState);
     res.json({
       success: true,
       eventState: updatedState
@@ -478,6 +537,8 @@ app.post('/api/admin/session/open', adminAuth, async (req, res) => {
   try {
     const updatedState = await Database.updateEventState(targetStatus, { durationMinutes, resetTimer: true });
     const assignedCount = await Database.ensureAllParticipantsAssigned();
+
+    broadcastEvent('SESSION_OPENED', { session: Number(session), eventState: updatedState });
 
     res.json({
       success: true,
@@ -496,6 +557,7 @@ app.post('/api/admin/session/lock', adminAuth, async (req, res) => {
   const targetStatus = Number(session) === 2 ? 'SESSION_2_LOCKED' : 'SESSION_1_LOCKED';
   try {
     const updatedState = await Database.updateEventState(targetStatus);
+    broadcastEvent('SESSION_LOCKED', { session: Number(session), eventState: updatedState });
     res.json({
       success: true,
       sessionLocked: Number(session),
@@ -510,6 +572,7 @@ app.post('/api/admin/session/lock', adminAuth, async (req, res) => {
 app.post('/api/admin/event/reset', adminAuth, async (req, res) => {
   try {
     const resetState = await Database.resetCompetition();
+    broadcastEvent('EVENT_RESET', resetState);
     res.json({
       success: true,
       message: 'Competition reset successfully.',
@@ -553,6 +616,7 @@ const handleAdminCreateParticipant = async (req, res) => {
     const { teamName, teamPassword, passcode } = req.body;
     const pass = teamPassword || passcode || '';
     const participant = await Database.createParticipantCredentials(teamName, pass);
+    broadcastEvent('PARTICIPANT_REGISTERED', { teamName: participant.teamName });
     res.json({
       success: true,
       participant: {
@@ -597,6 +661,7 @@ app.post('/api/admin/participants/update', adminAuth, handleAdminUpdateParticipa
 const handleAdminDeleteParticipant = async (req, res) => {
   try {
     const deleted = await Database.deleteParticipant(req.params.id);
+    broadcastEvent('LEADERBOARD_UPDATED', {});
     res.json({
       success: deleted
     });

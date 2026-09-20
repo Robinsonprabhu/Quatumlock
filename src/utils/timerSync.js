@@ -1,0 +1,98 @@
+/**
+ * Server-Authoritative Timer Synchronization Utility
+ * Calculates exact countdown from server timestamps and client clock offset.
+ */
+
+export class TimerSynchronizer {
+  constructor() {
+    this.clockOffset = 0; // serverTime - clientLocalTime
+    this.sessionStartTime = null;
+    this.sessionEndTime = null;
+    this.durationMinutes = 30;
+    this.timerPaused = false;
+    this.timerPausedAt = null;
+    this.status = 'CLOSED';
+    this.listeners = new Set();
+  }
+
+  /**
+   * Synchronize authoritative server timing
+   */
+  syncServerState(eventState) {
+    if (!eventState) return;
+
+    const now = Date.now();
+    if (eventState.server_time) {
+      this.clockOffset = Number(eventState.server_time) - now;
+    }
+
+    this.status = eventState.status || 'CLOSED';
+    this.durationMinutes = Number(eventState.session_duration_minutes) || 30;
+    this.sessionStartTime = eventState.session_start_time || null;
+    this.sessionEndTime = eventState.session_end_time || null;
+    this.timerPaused = Boolean(eventState.timer_paused);
+    this.timerPausedAt = eventState.timer_paused_at || null;
+
+    this.notifyListeners();
+  }
+
+  /**
+   * Get current server-synchronized time
+   */
+  getSynchronizedNow() {
+    return Date.now() + this.clockOffset;
+  }
+
+  /**
+   * Calculate exact remaining seconds
+   */
+  getRemainingSeconds() {
+    const isSessionActive = this.status === 'SESSION_1_ACTIVE' || this.status === 'SESSION_2_ACTIVE';
+    if (!isSessionActive) {
+      return this.durationMinutes * 60;
+    }
+
+    if (!this.sessionEndTime) {
+      return this.durationMinutes * 60;
+    }
+
+    if (this.timerPaused && this.timerPausedAt) {
+      const pausedEffectiveNow = this.timerPausedAt + this.clockOffset;
+      const remainingMs = Math.max(0, this.sessionEndTime - pausedEffectiveNow);
+      return Math.floor(remainingMs / 1000);
+    }
+
+    const currentServerTime = this.getSynchronizedNow();
+    const remainingMs = Math.max(0, this.sessionEndTime - currentServerTime);
+    return Math.floor(remainingMs / 1000);
+  }
+
+  /**
+   * Format remaining seconds as MM:SS
+   */
+  getFormattedTime() {
+    const totalSecs = this.getRemainingSeconds();
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  isExpired() {
+    const isSessionActive = this.status === 'SESSION_1_ACTIVE' || this.status === 'SESSION_2_ACTIVE';
+    if (!isSessionActive) return false;
+    return this.getRemainingSeconds() <= 0;
+  }
+
+  subscribe(callback) {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  notifyListeners() {
+    for (const listener of this.listeners) {
+      try { listener(this); } catch (e) {}
+    }
+  }
+}
+
+export const timerSynchronizer = new TimerSynchronizer();

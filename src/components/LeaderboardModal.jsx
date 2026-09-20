@@ -23,8 +23,6 @@ export const LeaderboardModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (!isOpen) return;
     fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 4000);
-    return () => clearInterval(interval);
   }, [isOpen]);
 
   if (!isOpen) return null;
