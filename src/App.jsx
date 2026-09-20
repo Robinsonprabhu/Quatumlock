@@ -63,6 +63,7 @@ export default function App() {
   const hasInitializedQuestionIndexRef = useRef(false);
   const lastSessionNumberRef = useRef(null);
 
+  const [revealedParas, setRevealedParas] = useState(1);
   const currentQuestion = currentQuestions[activeQuestionIndex] || currentQuestions[0] || null;
   const currentSessionNumber = eventState.active_session || 1;
 
@@ -93,6 +94,18 @@ export default function App() {
   useEffect(() => {
     scrollToTop();
   }, [activeQuestionIndex, currentSessionNumber, eventState.status]);
+
+  // Reset or initialize paragraph-by-paragraph reveal for the current question
+  useEffect(() => {
+    if (currentQuestion) {
+      const isSolved = currentQuestion.isSolved || solvedQuestions.includes(currentQuestion.id);
+      if (isSolved) {
+        setRevealedParas((currentQuestion.story || []).length || 1);
+      } else {
+        setRevealedParas(1);
+      }
+    }
+  }, [activeQuestionIndex, currentSessionNumber, currentQuestion?.id, solvedQuestions.length]);
 
   // Global Keyboard Listener: '/' opens command palette, 'Ctrl+Shift+A' opens Admin Auth Prompt
   useEffect(() => {
@@ -646,10 +659,171 @@ export default function App() {
                       {currentQuestion.name}
                     </h2>
                     <div className="story-text">
-                      {(currentQuestion.story || []).map((p, i) => (
-                        <p key={i} dangerouslySetInnerHTML={{ __html: p }} />
+                      {(currentQuestion.story || []).slice(0, revealedParas).map((p, i) => (
+                        <div
+                          key={i}
+                          className="story-para-entry"
+                          style={{
+                            marginBottom: '1rem',
+                            padding: '12px 16px',
+                            background: i === 0 ? 'rgba(0, 255, 102, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+                            borderLeft: i === revealedParas - 1 && revealedParas < (currentQuestion.story || []).length
+                              ? '3px solid var(--doom-cyan)'
+                              : '3px solid rgba(0, 255, 102, 0.35)',
+                            borderRadius: '0 6px 6px 0',
+                            animation: 'paraFadeIn 0.3s ease-out forwards',
+                            position: 'relative'
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '6px',
+                            borderBottom: '1px dashed rgba(0, 255, 102, 0.15)',
+                            paddingBottom: '4px'
+                          }}>
+                            <span style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: '0.68rem',
+                              color: 'var(--doom-green)',
+                              letterSpacing: '0.12em',
+                              fontWeight: 700
+                            }}>
+                              ▶ INTEL ENTRY [{String(i + 1).padStart(2, '0')}/{String((currentQuestion.story || []).length).padStart(2, '0')}]
+                            </span>
+                            {i === revealedParas - 1 && revealedParas < (currentQuestion.story || []).length && (
+                              <span style={{
+                                fontFamily: 'var(--font-mono)',
+                                fontSize: '0.62rem',
+                                color: 'var(--doom-cyan)',
+                                background: 'rgba(0, 229, 255, 0.12)',
+                                border: '1px solid rgba(0, 229, 255, 0.3)',
+                                padding: '1px 6px',
+                                borderRadius: '3px'
+                              }}>
+                                LATEST DECRYPT
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ margin: 0 }} dangerouslySetInnerHTML={{ __html: p }} />
+                        </div>
                       ))}
                     </div>
+
+                    {/* ─── PARAGRAPH-BY-PARAGRAPH REVEAL CONTROLS ─── */}
+                    {(currentQuestion.story || []).length > 1 && (
+                      <div style={{
+                        marginTop: '1.2rem',
+                        padding: '12px 18px',
+                        background: 'rgba(0, 255, 102, 0.05)',
+                        border: '1px solid rgba(0, 255, 102, 0.25)',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '100px',
+                            height: '6px',
+                            background: 'rgba(255,255,255,0.1)',
+                            borderRadius: '3px',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: `${Math.round((revealedParas / (currentQuestion.story || []).length) * 100)}%`,
+                              height: '100%',
+                              background: 'var(--doom-green)',
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--ink-dim)' }}>
+                            DECRYPTED {revealedParas} OF {(currentQuestion.story || []).length} ENTRIES ({Math.round((revealedParas / (currentQuestion.story || []).length) * 100)}%)
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {revealedParas < (currentQuestion.story || []).length ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn--primary btn--sm"
+                                onClick={() => {
+                                  SoundManager.play('click', soundOn);
+                                  setRevealedParas((prev) => Math.min((currentQuestion.story || []).length, prev + 1));
+                                }}
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(0,255,102,0.25), rgba(0,229,255,0.2))',
+                                  border: '1px solid var(--doom-green)',
+                                  color: 'var(--doom-green-bright)',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.78rem',
+                                  padding: '6px 14px',
+                                  letterSpacing: '0.08em',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                <span>⚡ REVEAL NEXT PARAGRAPH [{revealedParas + 1}/{(currentQuestion.story || []).length}]</span>
+                                <span>▾</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm"
+                                onClick={() => {
+                                  SoundManager.play('click', soundOn);
+                                  setRevealedParas((currentQuestion.story || []).length);
+                                }}
+                                style={{
+                                  border: '1px solid rgba(0,255,102,0.3)',
+                                  color: 'var(--ink-dim)',
+                                  fontSize: '0.72rem',
+                                  padding: '6px 10px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                REVEAL ALL
+                              </button>
+                            </>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{
+                                fontFamily: 'var(--font-mono)',
+                                fontSize: '0.75rem',
+                                color: 'var(--doom-green)',
+                                fontWeight: 'bold',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                <span>✓</span> FULL DOSSIER DECRYPTED
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm"
+                                onClick={() => setRevealedParas(1)}
+                                style={{
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  color: 'var(--ink-faint)',
+                                  fontSize: '0.68rem',
+                                  padding: '3px 8px',
+                                  cursor: 'pointer'
+                                }}
+                                title="Collapse back to first entry"
+                              >
+                                COLLAPSE
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

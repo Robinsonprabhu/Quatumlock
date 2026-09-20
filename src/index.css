@@ -511,6 +511,21 @@ button { font-family: inherit; cursor: pointer; }
   98% { text-shadow: 0 0 15px rgba(0,255,102,0.4); transform: none; }
 }
 
+@keyframes paraFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.story-para-entry {
+  transition: all 0.25s ease;
+}
+
 .story-text {
   font-family: var(--font-body);
   font-size: 1.22rem;
@@ -519,7 +534,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .story-text p {
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.5rem;
   padding-left: 0;
 }
 
