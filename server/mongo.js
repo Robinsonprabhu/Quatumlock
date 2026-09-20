@@ -123,68 +123,66 @@ export const MongoModels = {
 };
 
 let isConnected = false;
-let retryTimeout = null;
 let onConnectListeners = [];
+
+// Global cached connection for Node / Vercel Serverless
+if (!global._mongoCache) {
+  global._mongoCache = { conn: null, promise: null };
+}
 
 export function onMongoConnect(listener) {
   if (typeof listener === 'function') {
     onConnectListeners.push(listener);
-    if (isConnected) listener();
+    if (isConnected) {
+      try { listener(); } catch (e) {}
+    }
   }
 }
 
-let hasLoggedOfflineNotice = false;
-
 export async function connectMongoDB() {
-  // Reuse existing connection (critical for serverless — Vercel/Lambda keep connections warm)
   if (mongoose.connection.readyState === 1) {
     isConnected = true;
     return true;
   }
 
-  const sanitizedUri = MONGODB_URI.replace(/\/\/.*@/, '//***:***@');
-  try {
-    if (!hasLoggedOfflineNotice) {
-      console.log(`[MongoDB] Connecting to cluster (${sanitizedUri})...`);
-    }
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      // Keep connections alive across serverless invocations
-      maxPoolSize: 10,
-      minPoolSize: 0,
-      maxIdleTimeMS: 270000
-    });
+  if (global._mongoCache.conn) {
     isConnected = true;
-    console.log('[MongoDB] ✅ Successfully connected to MongoDB Escaperoom cluster!');
-    
-    // Notify registered listeners
-    for (const fn of onConnectListeners) {
-      try { fn(); } catch (e) {}
-    }
     return true;
-  } catch (err) {
-    isConnected = false;
-    if (!hasLoggedOfflineNotice) {
-      console.warn(`[MongoDB] ⚠️ Notice: MongoDB offline (${err.message.split('\n')[0]}).`);
-      console.warn('[MongoDB] Active engine: Local persistent JSON database (server/data/escape_db.json). Zero data loss guaranteed.');
-      hasLoggedOfflineNotice = true;
-    }
-
-    // Schedule silent background reconnection attempt
-    if (!retryTimeout) {
-      retryTimeout = setTimeout(() => {
-        retryTimeout = null;
-        connectMongoDB();
-      }, 30000);
-    }
-    return false;
   }
+
+  if (!global._mongoCache.promise) {
+    const sanitizedUri = MONGODB_URI.replace(/\/\/.*@/, '//***:***@');
+    console.log(`[MongoDB] Initializing permanent connection to cluster (${sanitizedUri})...`);
+
+    global._mongoCache.promise = mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 15,
+      minPoolSize: 2,
+      maxIdleTimeMS: 300000
+    }).then((m) => {
+      isConnected = true;
+      global._mongoCache.conn = m;
+      console.log('[MongoDB] ✅ Permanent MongoDB Atlas cluster connection active.');
+      for (const fn of onConnectListeners) {
+        try { fn(); } catch (e) {}
+      }
+      return m;
+    }).catch((err) => {
+      global._mongoCache.promise = null;
+      isConnected = false;
+      console.warn(`[MongoDB] Connection notice:`, err.message.split('\n')[0]);
+      return null;
+    });
+  }
+
+  const res = await global._mongoCache.promise;
+  return Boolean(res);
 }
 
 export function isMongoConnected() {
-  return isConnected && mongoose.connection.readyState === 1;
+  return mongoose.connection.readyState === 1;
 }
 
 export function getMongoUri() {

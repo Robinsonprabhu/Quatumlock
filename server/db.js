@@ -1400,18 +1400,6 @@ function saveDb() {
 
 loadDb();
 
-// Periodic background sanity check (heartbeat sync)
-setInterval(async () => {
-  try {
-    if (isMongoConnected()) {
-      await seedDataToMongo(db);
-    }
-  } catch (e) {
-    // Non-blocking
-  }
-}, 30_000);
-
-
 // ─────────────────────────────────────────────────────────────────────────────
 // DATABASE ACCESS METHODS
 // ─────────────────────────────────────────────────────────────────────────────
