@@ -47,7 +47,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
   const [saveToast, setSaveToast] = useState(null);
   const [adminToken, setAdminToken] = useState(() => propAdminToken || ADMIN_SECRET);
-  const [durationInput, setDurationInput] = useState(30);
+  const [durationInput, setDurationInput] = useState(60);
   const [leaderboardSearch, setLeaderboardSearch] = useState('');
   const [mongoStatus, setMongoStatus] = useState({ connected: false, uri: '' });
 
@@ -202,7 +202,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
           'Content-Type': 'application/json',
           'x-admin-token': adminToken
         },
-        body: JSON.stringify({ status: newStatus, durationMinutes: Number(durationInput) || 30 })
+        body: JSON.stringify({ status: newStatus, durationMinutes: Number(durationInput) || 60 })
       });
       const data = await res.json();
       if (data.success) {
@@ -678,7 +678,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
                     className={`admin-btn ${currentEventStatus === 'SESSION_1_ACTIVE' ? 'admin-btn--primary' : 'admin-btn--secondary'}`}
                     onClick={() => handleUpdateEventState('SESSION_1_ACTIVE')}
                   >
-                    ▶ [ 2. OPEN SESSION 1 (ROOMS 1–7) ]
+                    ▶ [ 2. OPEN SESSION 1 (CHAMBERS 01–15) ]
                   </button>
                   <button
                     className={`admin-btn ${currentEventStatus === 'SESSION_1_LOCKED' ? 'admin-btn--danger' : 'admin-btn--secondary'}`}
@@ -690,7 +690,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
                     className={`admin-btn ${currentEventStatus === 'SESSION_2_ACTIVE' ? 'admin-btn--primary' : 'admin-btn--secondary'}`}
                     onClick={() => handleUpdateEventState('SESSION_2_ACTIVE')}
                   >
-                    ⚡ [ 4. OPEN SESSION 2 (ROOMS 8–14) ]
+                    ⚡ [ 4. OPEN SESSION 2 (CHAMBERS 16–30) ]
                   </button>
                   <button
                     className={`admin-btn ${currentEventStatus === 'SESSION_2_LOCKED' ? 'admin-btn--danger' : 'admin-btn--secondary'}`}
@@ -1018,7 +1018,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
                                   {lastActiveDate}
                                 </td>
                                 <td style={{ padding: '12px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#fff' }}>
-                                  {p.progress || '0 / 7'}
+                                  {p.progress || '0 / 15'}
                                 </td>
                                 <td style={{ padding: '12px 10px', textAlign: 'right' }}>
                                   <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -1151,7 +1151,7 @@ export const AdminPanel = ({ isOpen, onClose, adminToken: propAdminToken }) => {
                                 {row.teamName}
                               </td>
                               <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
-                                {row.solvedCount || row.totalScore} / 14
+                                {row.solvedCount || row.totalScore} / 30
                               </td>
                               <td>
                                 {row.hintsUsedCount > 0 ? (

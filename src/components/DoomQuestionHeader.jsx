@@ -142,18 +142,21 @@ export const DoomQuestionHeader = ({ currentLevel, currentPartId }) => {
             </span>
           </div>
 
-          {/* Threat level bar */}
+          {/* Threat level bar (15 segments for current session) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {[...Array(10)].map((_, i) => (
-              <div key={i} style={{
-                width: '6px',
-                height: '4px',
-                borderRadius: '1px',
-                background: i < currentLevel.id ? threatColor : 'rgba(255,255,255,0.08)',
-                boxShadow: i < currentLevel.id ? `0 0 4px ${threatColor}` : 'none',
-                transition: 'all 0.3s ease',
-              }} />
-            )).reverse()}
+            {[...Array(15)].map((_, i) => {
+              const sessionLvl = ((currentLevel.id - 1) % 15) + 1;
+              return (
+                <div key={i} style={{
+                  width: '6px',
+                  height: '4px',
+                  borderRadius: '1px',
+                  background: i < sessionLvl ? threatColor : 'rgba(255,255,255,0.08)',
+                  boxShadow: i < sessionLvl ? `0 0 4px ${threatColor}` : 'none',
+                  transition: 'all 0.3s ease',
+                }} />
+              );
+            }).reverse()}
           </div>
 
           {/* Level badge */}
@@ -175,7 +178,7 @@ export const DoomQuestionHeader = ({ currentLevel, currentPartId }) => {
               textShadow: `0 0 12px ${threatColor}`,
               lineHeight: '1',
             }}>
-              {currentLevel.id}/10
+              {currentLevel.id}/30
             </div>
           </div>
         </div>

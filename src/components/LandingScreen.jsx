@@ -543,9 +543,9 @@ export const LandingScreen = ({
                           {row.rank === 1 ? '🥇 01' : row.rank === 2 ? '🥈 02' : row.rank === 3 ? '🥉 03' : `#${String(row.rank).padStart(2, '0')}`}
                         </td>
                         <td className="leaderboard-cell--team">{row.teamName}</td>
-                        <td>{row.session1Score} / 5</td>
-                        <td>{row.session2Score} / 5</td>
-                        <td className="leaderboard-cell--total-score">{row.totalScore} / 10</td>
+                        <td>{row.session1Score} / 15</td>
+                        <td>{row.session2Score} / 15</td>
+                        <td className="leaderboard-cell--total-score">{row.totalScore} / 30</td>
                         <td>
                           <span className={`leaderboard-status-tag ${row.isComplete ? 'leaderboard-status-tag--done' : 'leaderboard-status-tag--progress'}`}>
                             {row.isComplete ? '● COMPLETE' : '● IN PROGRESS'}

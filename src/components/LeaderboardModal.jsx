@@ -106,7 +106,7 @@ export const LeaderboardModal = ({ isOpen, onClose }) => {
                           {row.teamName}
                         </td>
                         <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
-                          {row.solvedCount || row.totalScore} / 14
+                          {row.solvedCount || row.totalScore} / 30
                         </td>
                         <td>
                           {row.hintsUsedCount > 0 ? (
@@ -118,9 +118,14 @@ export const LeaderboardModal = ({ isOpen, onClose }) => {
                               0 Hints
                             </span>
                           )}
+                          {row.wrongCount > 0 && (
+                            <div style={{ color: 'var(--doom-red)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
+                              {row.wrongCount} Wrong (−{row.wrongPenaltyPoints ?? (row.wrongCount * 2)} pts)
+                            </div>
+                          )}
                         </td>
                         <td className="leaderboard-cell--total-score" style={{ color: 'var(--doom-green-bright)', fontWeight: 'bold' }}>
-                          {row.totalPoints !== undefined ? `${row.totalPoints} PTS` : `${row.totalScore * 100} PTS`}
+                          {row.totalPoints !== undefined ? `${row.totalPoints} PTS` : `${row.totalScore * 20} PTS`}
                         </td>
                         <td>
                           <span className="leaderboard-tag">

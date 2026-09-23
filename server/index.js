@@ -187,7 +187,7 @@ app.post('/api/participant/register', async (req, res) => {
 
     const pass = teamPassword || passcode || '';
     const participant = await Database.registerParticipant(teamName, pass);
-    const eventState = await Database.getEventState();
+    const eventState = await Database.getEventState(participant.id);
 
     broadcastEvent('PARTICIPANT_REGISTERED', { teamName: participant.teamName });
 
@@ -215,7 +215,7 @@ const handleParticipantLogin = async (req, res) => {
 
     const pass = teamPassword || passcode || '';
     const participant = await Database.loginParticipant(teamName, pass);
-    const eventState = await Database.getEventState();
+    const eventState = await Database.getEventState(participant.id);
 
     res.json({
       success: true,
@@ -240,7 +240,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (token) {
     const participant = await Database.getParticipantByToken(token);
     if (participant) {
-      const eventState = await Database.getEventState();
+      const eventState = await Database.getEventState(participant.id);
       return res.json({
         success: true,
         participant: {
@@ -257,7 +257,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
       const pass = teamPassword || passcode || '';
       const participant = await Database.registerParticipant(teamName, pass);
-      const eventState = await Database.getEventState();
+      const eventState = await Database.getEventState(participant.id);
       broadcastEvent('PARTICIPANT_REGISTERED', { teamName: participant.teamName });
       return res.json({
         success: true,
@@ -346,7 +346,7 @@ app.post('/api/participant/join', async (req, res) => {
         return res.status(401).json({ error: 'AUTH_FAILED', message: loginErr.message });
       }
     }
-    const eventState = await Database.getEventState();
+    const eventState = await Database.getEventState(participant.id);
     return res.json({
       success: true,
       participant: { id: participant.id, teamName: participant.teamName, token: participant.token },
@@ -365,7 +365,7 @@ app.post('/api/participant/join', async (req, res) => {
 app.get('/api/session/:sessionNum/questions', participantAuth, async (req, res) => {
   try {
     const sessionNum = parseInt(req.params.sessionNum, 10);
-    const eventState = await Database.getEventState();
+    const eventState = await Database.getEventState(req.participant.id);
 
     if (sessionNum === 1 && eventState.status !== 'SESSION_1_ACTIVE') {
       return res.status(403).json({
@@ -399,7 +399,7 @@ app.get('/api/session/:sessionNum/questions', participantAuth, async (req, res) 
 const handleAnswerSubmission = async (req, res) => {
   const sessionNum = parseInt(req.params.sessionNum, 10);
   const { questionId, answer } = req.body;
-  const eventState = await Database.getEventState();
+  const eventState = await Database.getEventState(req.participant.id);
 
   if (!questionId || answer === undefined) {
     return res.status(400).json({ error: 'MISSING_DATA', message: 'questionId and answer are required.' });

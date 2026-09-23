@@ -14,6 +14,7 @@ import InvestigationJournal from './components/InvestigationJournal';
 import DoomCinematicEvent from './components/DoomCinematicEvent';
 import { HintModal } from './components/HintModal';
 import { FailureModal } from './components/FailureModal';
+import { CongratulationsModal } from './components/CongratulationsModal';
 import { FinalSequence } from './components/FinalSequence';
 import { ResultsScreen } from './components/ResultsScreen';
 import { AdminPanel } from './components/admin/AdminPanel';
@@ -47,6 +48,7 @@ export default function App() {
   const [commandModalOpen, setCommandModalOpen] = useState(false);
   const [commandModalMode, setCommandModalMode] = useState('command'); // 'command' | 'admin_auth'
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [congratsModalOpen, setCongratsModalOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   const [hintModalOpen, setHintModalOpen] = useState(false);
   const [levelSelectOpen, setLevelSelectOpen] = useState(false);
@@ -372,7 +374,7 @@ export default function App() {
   const triggerRoomTransition = (targetIndex, options = {}) => {
     const targetQ = currentQuestions[targetIndex];
     const fromTitle = currentQuestion ? (currentQuestion.title || currentQuestion.name) : 'CHAMBER COMPLETED';
-    const nextDisplayNumber = targetIndex + 1 + (currentSessionNumber === 2 ? 7 : 0);
+    const nextDisplayNumber = targetIndex + 1 + (currentSessionNumber === 2 ? 15 : 0);
 
     setTransitionData({
       fromRoom: fromTitle,
@@ -398,6 +400,7 @@ export default function App() {
     setTeamName('');
     setCurrentQuestions([]);
     setSolvedQuestions([]);
+    setCongratsModalOpen(false);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -431,6 +434,22 @@ export default function App() {
       if (data && data.success) {
         SoundManager.play('success', soundOn);
 
+        // Update currentQuestions with solved and attempts status
+        setCurrentQuestions((prev) =>
+          prev.map((q) =>
+            q.id === currentQuestion.id
+              ? {
+                  ...q,
+                  isSolved: true,
+                  attemptsRemaining: 0,
+                  attemptsUsed: data.attemptsUsed || 1,
+                  isLocked: false,
+                  potentialPoints: data.pointsEarned !== undefined ? data.pointsEarned : q.potentialPoints
+                }
+              : q
+          )
+        );
+
         const updatedSolved = Array.from(new Set([...solvedQuestions, currentQuestion.id]));
         setSolvedQuestions(updatedSolved);
 
@@ -441,12 +460,13 @@ export default function App() {
           ]);
         }
 
-        narrativeEngine.onCorrectAnswer(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0)}`);
+        narrativeEngine.onCorrectAnswer(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 15 : 0)}`);
 
-        // Use updatedSolved (freshly computed) — only complete when all 7 questions are solved
+        // Use updatedSolved (freshly computed) — only complete when all 15 questions are solved
         const currentSessionSolvedCount = currentQuestions.filter((q) => updatedSolved.includes(q.id)).length;
-        if (currentQuestions.length >= 7 && currentSessionSolvedCount >= currentQuestions.length) {
+        if (currentQuestions.length >= 15 && currentSessionSolvedCount >= currentQuestions.length) {
           triggerRoomTransition(activeQuestionIndex, { isSessionComplete: true });
+          setCongratsModalOpen(true);
           // Complete session on backend
           await fetch(`/api/session/${currentSessionNumber}/complete`, {
             method: 'POST',
@@ -467,8 +487,34 @@ export default function App() {
         return { success: true, ...data };
       } else {
         SoundManager.play('alert', soundOn);
-        narrativeEngine.onWrongAnswer(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0)}`);
-        return { success: false, message: data.message || 'ACCESS DENIED — response not recognized.' };
+        narrativeEngine.onWrongAnswer(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 15 : 0)}`);
+
+        // Update attemptsRemaining and isLocked in currentQuestions
+        if (data && (data.attemptsRemaining !== undefined || data.isLocked !== undefined)) {
+          setCurrentQuestions((prev) =>
+            prev.map((q) =>
+              q.id === currentQuestion.id
+                ? {
+                    ...q,
+                    attemptsRemaining: data.attemptsRemaining,
+                    attemptsUsed: data.attemptsUsed,
+                    isLocked: Boolean(data.isLocked),
+                    potentialPoints: data.isLocked ? 0 : Math.max(0, (q.potentialPoints || 20) - 2)
+                  }
+                : q
+            )
+          );
+        }
+
+        // Trigger server state sync to immediately reflect any updates
+        syncServerState();
+        return {
+          success: false,
+          attemptsRemaining: data?.attemptsRemaining,
+          attemptsUsed: data?.attemptsUsed,
+          isLocked: data?.isLocked,
+          message: data?.message || 'ACCESS DENIED — −2 Points Penalty.'
+        };
       }
     } catch (err) {
       return { success: false, message: 'NETWORK ERROR — failed to validate answer.' };
@@ -485,7 +531,7 @@ export default function App() {
     });
 
     const numPenalty = Number(penalty) || 20;
-    narrativeEngine.onHintUsed(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0)}`);
+    narrativeEngine.onHintUsed(`level_${activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 15 : 0)}`);
 
     // Authoritative server-side hint recording & point deduction
     if (participantToken && currentQuestion) {
@@ -502,6 +548,12 @@ export default function App() {
         })
       })
         .then((res) => res.json())
+        .then((data) => {
+          if (data && data.eventState) {
+            timerSynchronizer.syncServerState(data.eventState);
+            setRemainingTime(timerSynchronizer.getRemainingSeconds());
+          }
+        })
         .catch((err) => console.warn('[Hint] Server sync error:', err));
     }
   };
@@ -569,7 +621,7 @@ export default function App() {
     eventState.status === 'EVENT_FINISHED'
   );
 
-  const displayLevelNumber = activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 7 : 0);
+  const displayLevelNumber = activeQuestionIndex + 1 + (currentSessionNumber === 2 ? 15 : 0);
 
   return (
     <div>
@@ -610,11 +662,11 @@ export default function App() {
       ) : (
         /* ACTIVE COMPETITION STAGE VIEWPORT */
         <section id="screen-game" className="screen screen-game is-active">
-          {/* STAGE TRACKER (QUESTIONS 1 TO 7 OF ACTIVE SESSION) */}
+          {/* STAGE TRACKER (QUESTIONS 1 TO 15 OF ACTIVE SESSION) */}
           <StageTracker
             currentPartId={currentSessionNumber}
             levels={currentQuestions.map((q, idx) => ({
-              id: idx + 1 + (currentSessionNumber === 2 ? 7 : 0),
+              id: idx + 1 + (currentSessionNumber === 2 ? 15 : 0),
               key: q.id,
               name: q.title || q.name,
               subtitle: q.subtitle
@@ -665,7 +717,7 @@ export default function App() {
                       </span>
                     </div>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--ink-faint)' }}>
-                      SESSION {currentSessionNumber} · CHAMBER {displayLevelNumber}/14 ({currentQuestion.category})
+                      SESSION {currentSessionNumber} · CHAMBER {displayLevelNumber}/30 ({currentQuestion.category})
                     </span>
                   </div>
 
@@ -864,11 +916,17 @@ export default function App() {
                 <PuzzleCard
                   key={`puzzle_${currentQuestion.id || activeQuestionIndex}_${displayLevelNumber}`}
                   stage={{
+                    ...currentQuestion,
                     id: displayLevelNumber,
                     key: currentQuestion.id,
+                    name: currentQuestion.title || currentQuestion.name,
                     question: currentQuestion.question,
                     hints: currentQuestion.hints,
-                    isSolved: currentQuestion.isSolved || solvedQuestions.includes(currentQuestion.id)
+                    isSolved: currentQuestion.isSolved || solvedQuestions.includes(currentQuestion.id),
+                    attemptsRemaining: currentQuestion.attemptsRemaining,
+                    attemptsUsed: currentQuestion.attemptsUsed,
+                    isLocked: currentQuestion.isLocked,
+                    potentialPoints: currentQuestion.potentialPoints
                   }}
                   hintsUsed={hintsUsed}
                   isTimeExpired={isTimeExpired}
@@ -911,10 +969,10 @@ export default function App() {
         parts={[
           {
             id: currentSessionNumber,
-            title: `SESSION ${currentSessionNumber}: ${currentSessionNumber === 1 ? 'AVENGERS TOWER CORE (LEVELS 1–7)' : 'INNER SANCTUM PROTOCOLS (LEVELS 8–14)'}`,
-            description: `Your assigned 7 chambers for Session ${currentSessionNumber}`,
+            title: `SESSION ${currentSessionNumber}: ${currentSessionNumber === 1 ? 'AVENGERS TOWER CORE (LEVELS 01–15)' : 'INNER SANCTUM PROTOCOLS (LEVELS 16–30)'}`,
+            description: `Your assigned 15 chambers for Session ${currentSessionNumber}`,
             levels: currentQuestions.map((q, idx) => ({
-              id: idx + 1 + (currentSessionNumber === 2 ? 7 : 0),
+              id: idx + 1 + (currentSessionNumber === 2 ? 15 : 0),
               key: q.id,
               name: q.name,
               subtitle: q.subtitle
@@ -992,6 +1050,20 @@ export default function App() {
       <LeaderboardModal
         isOpen={leaderboardOpen}
         onClose={() => setLeaderboardOpen(false)}
+      />
+
+      {/* CONGRATULATIONS & SESSION FINISHED POPUP */}
+      <CongratulationsModal
+        isOpen={congratsModalOpen}
+        sessionNumber={currentSessionNumber}
+        teamName={teamName}
+        stats={sessionStats}
+        onClose={() => setCongratsModalOpen(false)}
+        onLogout={handleLogout}
+        onViewLeaderboard={() => {
+          setCongratsModalOpen(false);
+          setLeaderboardOpen(true);
+        }}
       />
 
       {/* FAILURE / SESSION TIMEOUT MODAL */}

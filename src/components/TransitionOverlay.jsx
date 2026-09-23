@@ -178,7 +178,7 @@ export const TransitionOverlay = ({
           <div className="cinematic-heading-group">
             <div className="cinematic-eyebrow">
               <span className="cinematic-eyebrow-accent">
-                ⚡ {isSessionComplete ? 'FINAL EVALUATION' : `ENTER CHAMBER ${String(toLevelNumber).padStart(2, '0')} / 14`}
+                ⚡ {isSessionComplete ? 'FINAL EVALUATION' : `ENTER CHAMBER ${String(toLevelNumber).padStart(2, '0')} / 30`}
               </span>
               <span className="cinematic-eyebrow-cat">[{toCategory.toUpperCase()}]</span>
             </div>

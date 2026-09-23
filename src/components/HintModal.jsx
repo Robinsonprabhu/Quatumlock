@@ -129,7 +129,7 @@ export const HintModal = ({ isOpen, stage, hintsUsed = {}, onRevealHint, onClose
             }}
           >
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--ink-dim)', fontFamily: 'var(--font-mono)' }}>
-              ⚠ Revealing classified intel costs <strong>both timer countdown and score points</strong>.
+              ⚠ Revealing classified intel reduces <strong>individual timer countdown</strong> and <strong>chamber score</strong> (Base: 20 pts).
             </p>
             {totalPenalty > 0 && (
               <span
@@ -140,7 +140,7 @@ export const HintModal = ({ isOpen, stage, hintsUsed = {}, onRevealHint, onClose
                   fontWeight: 'bold',
                 }}
               >
-                TOTAL PENALTY: −{totalPenalty}s / −{totalPenalty} pts
+                TOTAL PENALTY: −{totalPenalty}s timer / −{used.length >= 3 ? 20 : (used.length === 2 ? 8 : (used.length === 1 ? 3 : 0))} pts
               </span>
             )}
           </div>
@@ -150,12 +150,14 @@ export const HintModal = ({ isOpen, stage, hintsUsed = {}, onRevealHint, onClose
             {hints.map((h, idx) => {
               const alreadyRevealed = used.includes(idx);
               const tierNames = [
-                'HINT 1 · GUIDANCE INTEL',
-                'HINT 2 · SYSTEM ANALYSIS',
-                'HINT 3 · DIRECT OVERRIDE CIPHER (EXACT ANSWER)'
+                'HINT 1 · GUIDANCE INTEL (−3 PTS)',
+                'HINT 2 · SYSTEM ANALYSIS (−5 PTS)',
+                'HINT 3 · DIRECT OVERRIDE CIPHER (EXACT ANSWER ∙ 0 PTS TOTAL)'
               ];
               const tierName = tierNames[idx] || `HINT ${idx + 1}`;
-              const penaltyLabel = idx === 2 ? `−${h.penalty}s / 0 PTS EARNED` : `−${h.penalty}s / −${idx === 0 ? 30 : 60} pts`;
+              const penaltyLabel = idx === 2
+                ? `−${h.penalty || 20}s timer / 0 PTS EARNED`
+                : `−${h.penalty || 20}s timer / −${idx === 0 ? 3 : 5} pts`;
 
               return (
                 <div

@@ -74,7 +74,7 @@ export const WaitingRoom = ({
                 <span style={{ color: 'var(--doom-green)' }}>[00:00:02]</span> AUTHENTICATED TEAM: {teamName || 'UNKNOWN'}
               </div>
               <div className="waiting-card__terminal-line">
-                <span style={{ color: 'var(--doom-amber)' }}>[00:00:03]</span> STATUS: SESSION 1 ACCESS LOCKED
+                <span style={{ color: 'var(--doom-amber)' }}>[00:00:03]</span> STATUS: SESSION 1 ACCESS LOCKED (15 CHAMBERS)
               </div>
               <div className="waiting-card__terminal-line" style={{ color: 'var(--ink-faint)' }}>
                 <span>[00:00:04]</span> Awaiting Game Master authorization command...
@@ -90,23 +90,23 @@ export const WaitingRoom = ({
 
         {(status === 'SESSION_1_LOCKED' || status === 'WAITING_FOR_SESSION_2' || (status === 'SESSION_1_ACTIVE' && sessionStats.session1Completed)) && (
           <div className="waiting-card">
-            <div className="waiting-card__icon-orb" style={{ borderColor: 'var(--doom-cyan)' }}>
-              <span className="waiting-card__icon">⚡</span>
+            <div className="waiting-card__icon-orb" style={{ borderColor: 'var(--doom-green)' }}>
+              <span className="waiting-card__icon">🎉</span>
             </div>
 
-            <h1 className="waiting-card__title" style={{ color: 'var(--doom-cyan)' }}>
-              SESSION 1 SECURED — INTERMISSION
+            <h1 className="waiting-card__title" style={{ color: 'var(--doom-green)' }}>
+              CONGRATULATIONS! SESSION 1 SECURED
             </h1>
 
             <p className="waiting-card__subtitle">
-              Chambers 1–7 completed & audited. Scores and points are stored in database. Intermission / Lunch break active. Awaiting Game Master authorization for Session 2.
+              Chambers 01–15 completed & audited. Scores and points are stored in database. Intermission active. Awaiting Game Master authorization for Session 2.
             </p>
 
             {/* PERFORMANCE RECAP */}
             <div className="waiting-card__stats-grid">
               <div className="waiting-stat-box">
                 <span className="waiting-stat-box__label">SESSION 1 SCORE</span>
-                <span className="waiting-stat-box__value">{s1Score} / 7</span>
+                <span className="waiting-stat-box__value">{s1Score} / 15</span>
               </div>
 
               <div className="waiting-stat-box">
@@ -124,17 +124,26 @@ export const WaitingRoom = ({
 
             <div className="waiting-card__terminal" style={{ marginTop: '1.2rem' }}>
               <div className="waiting-card__terminal-line">
-                <span style={{ color: 'var(--doom-cyan)' }}>[SESSION 1]</span> Verified on server & MongoDB. Score: {s1Score}/7 in {formatTime(s1Time)}.
+                <span style={{ color: 'var(--doom-cyan)' }}>[SESSION 1]</span> Verified on server & MongoDB. Score: {s1Score}/15 in {formatTime(s1Time)}.
               </div>
               <div className="waiting-card__terminal-line">
-                <span style={{ color: 'var(--doom-purple)' }}>[SESSION 2]</span> Chambers 8–14 (Inner Sanctum) will unlock automatically when Game Master transmits the signal.
+                <span style={{ color: 'var(--doom-purple)' }}>[SESSION 2]</span> Chambers 16–30 (Inner Sanctum) will unlock automatically when Game Master transmits the signal.
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn--primary btn--md" onClick={onOpenLeaderboard}>
                 🏆 VIEW LIVE LEADERBOARD
               </button>
+              {onLogout && (
+                <button
+                  className="btn btn--ghost btn--md"
+                  style={{ borderColor: 'rgba(255, 34, 68, 0.5)', color: 'var(--doom-red, #ff2244)' }}
+                  onClick={onLogout}
+                >
+                  🚪 LOG OUT
+                </button>
+              )}
             </div>
 
             <div className="waiting-card__footer" style={{ marginTop: '1rem' }}>
@@ -146,22 +155,22 @@ export const WaitingRoom = ({
 
         {(status === 'SESSION_2_LOCKED' || (status === 'SESSION_2_ACTIVE' && sessionStats.session2Completed)) && (
           <div className="waiting-card">
-            <div className="waiting-card__icon-orb" style={{ borderColor: 'var(--doom-purple)' }}>
-              <span className="waiting-card__icon">🏁</span>
+            <div className="waiting-card__icon-orb" style={{ borderColor: 'var(--doom-green)' }}>
+              <span className="waiting-card__icon">👑</span>
             </div>
 
-            <h1 className="waiting-card__title" style={{ color: 'var(--doom-purple)' }}>
-              SESSION 2 COMPLETED
+            <h1 className="waiting-card__title" style={{ color: 'var(--doom-green)' }}>
+              CONGRATULATIONS! SESSION 2 COMPLETED
             </h1>
 
             <p className="waiting-card__subtitle">
-              All 14 Chambers audited. Standby for final rankings and award ceremony.
+              All 30 Chambers audited. You have cleared the compound breach! Standby for final rankings and award ceremony.
             </p>
 
             <div className="waiting-card__stats-grid">
               <div className="waiting-stat-box">
                 <span className="waiting-stat-box__label">TOTAL SCORE</span>
-                <span className="waiting-stat-box__value">{totalScore} / 14</span>
+                <span className="waiting-stat-box__value">{totalScore} / 30</span>
               </div>
               <div className="waiting-stat-box">
                 <span className="waiting-stat-box__label">TOTAL TIME</span>
@@ -169,10 +178,19 @@ export const WaitingRoom = ({
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn--primary btn--lg" onClick={onOpenLeaderboard}>
                 🏆 VIEW FINAL LEADERBOARD
               </button>
+              {onLogout && (
+                <button
+                  className="btn btn--ghost btn--lg"
+                  style={{ borderColor: 'rgba(255, 34, 68, 0.5)', color: 'var(--doom-red, #ff2244)' }}
+                  onClick={onLogout}
+                >
+                  🚪 LOG OUT
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -184,17 +202,17 @@ export const WaitingRoom = ({
             </div>
 
             <h1 className="waiting-card__title" style={{ color: 'var(--doom-green-bright)' }}>
-              AIDEX'26 MISSION COMPLETE
+              CONGRATULATIONS! MISSION COMPLETE
             </h1>
 
             <p className="waiting-card__subtitle">
-              The Doomsday Protocol has terminated. Both sessions are complete!
+              The Doomsday Protocol has terminated. Both sessions (30 Chambers) are fully finished!
             </p>
 
             <div className="waiting-card__stats-grid">
               <div className="waiting-stat-box">
                 <span className="waiting-stat-box__label">TOTAL SCORE</span>
-                <span className="waiting-stat-box__value">{totalScore} / 14</span>
+                <span className="waiting-stat-box__value">{totalScore} / 30</span>
               </div>
               <div className="waiting-stat-box">
                 <span className="waiting-stat-box__label">TOTAL TIME</span>
@@ -202,10 +220,19 @@ export const WaitingRoom = ({
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn--primary btn--lg" onClick={onOpenLeaderboard}>
                 🏆 VIEW FINAL COMPETITION LEADERBOARD
               </button>
+              {onLogout && (
+                <button
+                  className="btn btn--ghost btn--lg"
+                  style={{ borderColor: 'rgba(255, 34, 68, 0.5)', color: 'var(--doom-red, #ff2244)' }}
+                  onClick={onLogout}
+                >
+                  🚪 LOG OUT
+                </button>
+              )}
             </div>
           </div>
         )}

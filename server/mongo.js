@@ -23,7 +23,7 @@ const EventStateSchema = new mongoose.Schema({
   session2_started_at: { type: Number, default: null },
   session2_locked_at: { type: Number, default: null },
   event_finished_at: { type: Number, default: null },
-  session_duration_minutes: { type: Number, default: 30 },
+  session_duration_minutes: { type: Number, default: 60 },
   timer_paused: { type: Boolean, default: false },
   timer_paused_at: { type: Number, default: null },
   time_adjustment_seconds: { type: Number, default: 0 }
@@ -76,6 +76,8 @@ const AnswerSchema = new mongoose.Schema({
   sessionNumber: { type: Number, required: true },
   submittedAnswer: { type: String, required: true },
   isCorrect: { type: Boolean, required: true },
+  attemptNumber: { type: Number, default: 1 },
+  pointsEarned: { type: Number, default: 0 },
   submittedAt: { type: Number, default: () => Date.now() }
 }, { timestamps: true });
 
