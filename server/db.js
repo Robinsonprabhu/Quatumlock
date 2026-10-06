@@ -684,10 +684,16 @@ export const Database = {
   // --- ANSWERS & SCORING ---
   async submitAnswer(participantId, questionId, sessionNumber, rawAnswer) {
     await ensureDb();
-    const [participant, question, eventStateDoc] = await Promise.all([
+
+    // Fetch all required data concurrently in a single parallel batch
+    const [participant, question, eventStateDoc, previousAnswers, allHints, assignments, pSession] = await Promise.all([
       MongoModels.Participant.findOne({ id: participantId }).lean(),
       MongoModels.Question.findOne({ $or: [{ id: questionId }, { originalId: questionId }] }).lean(),
-      MongoModels.EventState.findOne({}).lean()
+      MongoModels.EventState.findOne({}).lean(),
+      MongoModels.Answer.find({ participantId, questionId }).sort({ submittedAt: 1 }).lean(),
+      MongoModels.HintUsed.find({ participantId }).lean(),
+      MongoModels.QuestionAssignment.find({ participantId, sessionNumber }).lean(),
+      MongoModels.ParticipantSession.findOne({ participantId }).lean()
     ]);
 
     if (!participant) throw new Error('Participant not found.');
@@ -698,34 +704,58 @@ export const Database = {
       throw new Error(`CHAMBER LOCKED: Session ${sessionNumber} is currently not accepting submissions.`);
     }
 
-    // Check individual participant countdown expiration
-    const participantState = await this.getEventState(participantId);
-    if (participantState.is_expired) {
+    // Check individual participant countdown expiration in memory
+    const now = Date.now();
+    const activeSession = eventStateDoc.active_session || (eventStateDoc.status?.startsWith('SESSION_2') ? 2 : (eventStateDoc.status?.startsWith('SESSION_1') ? 1 : 0));
+    const sessionKey = activeSession === 1 ? 'session1' : 'session2';
+    let startedAt = activeSession ? eventStateDoc[`session${activeSession}_started_at`] : null;
+    if (pSession && pSession[sessionKey]?.startedAt) {
+      startedAt = pSession[sessionKey].startedAt;
+    }
+    const durationMinutes = eventStateDoc.session_duration_minutes || 60;
+    const timeAdjustmentSec = eventStateDoc.time_adjustment_seconds || 0;
+
+    const sessionQIds = new Set((assignments || []).map((a) => a.questionId));
+    const participantHintPenaltySec = (allHints || [])
+      .filter((h) => sessionQIds.has(h.questionId))
+      .reduce((sum, h) => sum + (Number(h.penalty) || 20), 0);
+
+    const baseAllowedSec = Math.max(0, (durationMinutes * 60) + timeAdjustmentSec - participantHintPenaltySec);
+    let sessionRemainingSec = 0;
+    let isExpired = false;
+    if (startedAt && (eventStateDoc.status === 'SESSION_1_ACTIVE' || eventStateDoc.status === 'SESSION_2_ACTIVE')) {
+      const effectiveNow = (eventStateDoc.timer_paused && eventStateDoc.timer_paused_at) ? eventStateDoc.timer_paused_at : now;
+      const elapsedSec = Math.max(0, Math.floor((effectiveNow - startedAt) / 1000));
+      sessionRemainingSec = Math.max(0, baseAllowedSec - elapsedSec);
+      if (sessionRemainingSec <= 0) {
+        isExpired = true;
+      }
+    } else {
+      sessionRemainingSec = baseAllowedSec;
+    }
+
+    if (isExpired) {
       throw new Error('COUNTDOWN EXPIRED: Your session timer has ended. Chamber inputs are locked.');
     }
 
     // Check previous attempts for this question
-    const previousAnswers = await MongoModels.Answer.find({
-      participantId,
-      questionId
-    }).sort({ submittedAt: 1 }).lean();
-
-    const isAlreadySolved = previousAnswers.some(a => a.isCorrect);
+    const prevList = previousAnswers || [];
+    const isAlreadySolved = prevList.some((a) => a.isCorrect);
     if (isAlreadySolved) {
-      const correctAns = previousAnswers.find(a => a.isCorrect);
+      const correctAns = prevList.find((a) => a.isCorrect);
       return {
         success: true,
         isCorrect: true,
         isAlreadySolved: true,
         attemptsRemaining: 0,
-        attemptsUsed: previousAnswers.length,
+        attemptsUsed: prevList.length,
         isLocked: false,
         pointsEarned: correctAns?.pointsEarned || 0,
         message: 'CHAMBER ALREADY BREACHED.'
       };
     }
 
-    const wrongAttempts = previousAnswers.filter(a => !a.isCorrect).length;
+    const wrongAttempts = prevList.filter((a) => !a.isCorrect).length;
     if (wrongAttempts >= 2) {
       throw new Error('MAX ATTEMPTS REACHED (2/2): Chamber inputs are permanently locked. 0 points awarded.');
     }
@@ -745,7 +775,9 @@ export const Database = {
     });
 
     const currentAttemptNumber = wrongAttempts + 1;
-    const qHints = await MongoModels.HintUsed.find({ participantId, questionId }).lean();
+    const qHints = (allHints || []).filter(
+      (h) => h.questionId === questionId || h.questionId === question.id || h.questionId === question.originalId
+    );
 
     if (isCorrect) {
       // Base: 20 points
@@ -781,30 +813,25 @@ export const Database = {
         submittedAt: Date.now()
       };
 
-      await MongoModels.Answer.create(answerRecord);
+      const sessDoc = pSession || {
+        participantId,
+        teamName: participant.teamName,
+        session1: { startedAt: null, completedAt: null, duration: 0, score: 0, answersCount: 0, completed: false },
+        session2: { startedAt: null, completedAt: null, duration: 0, score: 0, answersCount: 0, completed: false },
+        totalScore: 0,
+        totalTime: 0
+      };
 
-      // Update ParticipantSession score
-      const sessionKey = sessionNumber === 1 ? 'session1' : 'session2';
-      let pSession = await MongoModels.ParticipantSession.findOne({ participantId }).lean();
-      if (!pSession) {
-        pSession = {
-          participantId,
-          teamName: participant.teamName,
-          session1: { startedAt: null, completedAt: null, duration: 0, score: 0, answersCount: 0, completed: false },
-          session2: { startedAt: null, completedAt: null, duration: 0, score: 0, answersCount: 0, completed: false },
-          totalScore: 0,
-          totalTime: 0
-        };
-      }
-
-      const sessObj = pSession[sessionKey] || { score: 0, answersCount: 0 };
+      const sessObj = sessDoc[sessionKey] || { score: 0, answersCount: 0 };
       sessObj.score = (sessObj.score || 0) + 1; // count of solved rooms
       sessObj.answersCount = (sessObj.answersCount || 0) + 1;
 
-      const s1Score = sessionNumber === 1 ? sessObj.score : (pSession.session1?.score || 0);
-      const s2Score = sessionNumber === 2 ? sessObj.score : (pSession.session2?.score || 0);
+      const s1Score = sessionNumber === 1 ? sessObj.score : (sessDoc.session1?.score || 0);
+      const s2Score = sessionNumber === 2 ? sessObj.score : (sessDoc.session2?.score || 0);
 
+      // Perform DB writes concurrently in parallel
       await Promise.all([
+        MongoModels.Answer.create(answerRecord),
         MongoModels.ParticipantSession.findOneAndUpdate(
           { participantId },
           {
@@ -846,7 +873,11 @@ export const Database = {
         submittedAt: Date.now()
       };
 
-      await MongoModels.Answer.create(answerRecord);
+      // Perform DB writes concurrently
+      await Promise.all([
+        MongoModels.Answer.create(answerRecord),
+        MongoModels.Participant.updateOne({ id: participantId }, { $set: { lastActiveAt: Date.now() } })
+      ]);
 
       const attemptsRemaining = Math.max(0, 2 - currentAttemptNumber);
       const isLocked = attemptsRemaining === 0;

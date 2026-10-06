@@ -114,6 +114,10 @@ const HintUsedSchema = new mongoose.Schema({
   usedAt: { type: Number, default: () => Date.now() }
 }, { timestamps: true });
 
+AnswerSchema.index({ participantId: 1, questionId: 1 });
+HintUsedSchema.index({ participantId: 1, questionId: 1 });
+QuestionAssignmentSchema.index({ participantId: 1, sessionNumber: 1 });
+
 export const MongoModels = {
   EventState: mongoose.models.EventState || mongoose.model('EventState', EventStateSchema),
   Question: mongoose.models.Question || mongoose.model('Question', QuestionSchema),

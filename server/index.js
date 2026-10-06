@@ -399,18 +399,9 @@ app.get('/api/session/:sessionNum/questions', participantAuth, async (req, res) 
 const handleAnswerSubmission = async (req, res) => {
   const sessionNum = parseInt(req.params.sessionNum, 10);
   const { questionId, answer } = req.body;
-  const eventState = await Database.getEventState(req.participant.id);
 
   if (!questionId || answer === undefined) {
     return res.status(400).json({ error: 'MISSING_DATA', message: 'questionId and answer are required.' });
-  }
-
-  if (sessionNum === 1 && eventState.status !== 'SESSION_1_ACTIVE') {
-    return res.status(403).json({ error: 'SESSION_LOCKED', message: 'Session 1 is no longer active.' });
-  }
-
-  if (sessionNum === 2 && eventState.status !== 'SESSION_2_ACTIVE') {
-    return res.status(403).json({ error: 'SESSION_LOCKED', message: 'Session 2 is no longer active.' });
   }
 
   try {
