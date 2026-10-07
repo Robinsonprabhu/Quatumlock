@@ -2,7 +2,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q01",
     "title": "ROOM 01: THE DOOM GATE",
-    "subtitle": "If-Else Decisions",
+    "subtitle": "Perimeter Gate Logic",
     "category": "Programming",
     "difficulty": "Easy",
     "enabled": true,
@@ -50,7 +50,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q02",
     "title": "ROOM 02: THE ENDLESS SIGNAL",
-    "subtitle": "Loops",
+    "subtitle": "Telemetry Signal Cycle",
     "category": "Programming",
     "difficulty": "Easy",
     "enabled": true,
@@ -98,7 +98,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q03",
     "title": "ROOM 03: THE NUMBERED VAULT",
-    "subtitle": "Arrays",
+    "subtitle": "Storage Compartment Matrix",
     "category": "Programming",
     "difficulty": "Easy",
     "enabled": true,
@@ -145,7 +145,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q04",
     "title": "ROOM 04: THE LAST WEAPON",
-    "subtitle": "Stack",
+    "subtitle": "Vertical Launch Silo",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -191,7 +191,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q05",
     "title": "ROOM 05: THE FIRST SURVIVOR",
-    "subtitle": "Queue",
+    "subtitle": "Airlock Evacuation Corridor",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -237,7 +237,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q06",
     "title": "ROOM 06: THE MIXED ARCHIVE",
-    "subtitle": "Sorting",
+    "subtitle": "Central Records Vault",
     "category": "Algorithms",
     "difficulty": "Easy",
     "enabled": true,
@@ -283,7 +283,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q07",
     "title": "ROOM 07: THE HIDDEN RECORD",
-    "subtitle": "Linear Search",
+    "subtitle": "Sequential Sensor Sweep",
     "category": "Algorithms",
     "difficulty": "Easy",
     "enabled": true,
@@ -329,7 +329,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q08",
     "title": "ROOM 08: THE HALF MAP",
-    "subtitle": "Binary Search",
+    "subtitle": "Partitioned Index Divide",
     "category": "Algorithms",
     "difficulty": "Easy",
     "enabled": true,
@@ -374,7 +374,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q09",
     "title": "ROOM 09: THE SMALLER COPY",
-    "subtitle": "Recursion",
+    "subtitle": "Harmonic Resonance Chamber",
     "category": "Programming",
     "difficulty": "Easy",
     "enabled": true,
@@ -420,7 +420,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q10",
     "title": "ROOM 10: THE UNIQUE ID",
-    "subtitle": "Primary Key",
+    "subtitle": "Citadel Master Registry",
     "category": "DBMS",
     "difficulty": "Easy",
     "enabled": true,
@@ -466,7 +466,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q11",
     "title": "ROOM 11: THE CLASS OF GUARDS",
-    "subtitle": "Inheritance",
+    "subtitle": "Automaton Blueprint Archive",
     "category": "OOP",
     "difficulty": "Easy",
     "enabled": true,
@@ -511,7 +511,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q12",
     "title": "ROOM 12: THE MANY GUARDS",
-    "subtitle": "Polymorphism",
+    "subtitle": "Adaptive Defense Subsystem",
     "category": "OOP",
     "difficulty": "Easy",
     "enabled": true,
@@ -556,7 +556,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q13",
     "title": "ROOM 13: THE LOCKED DATA",
-    "subtitle": "Encapsulation",
+    "subtitle": "Hermetic Reactor Boundary",
     "category": "OOP",
     "difficulty": "Easy",
     "enabled": true,
@@ -601,7 +601,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q14",
     "title": "ROOM 14: THE TWO WAITING GUARDS",
-    "subtitle": "Deadlock",
+    "subtitle": "Resource Allocation Monitor",
     "category": "Operating Systems",
     "difficulty": "Easy",
     "enabled": true,
@@ -646,7 +646,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q15",
     "title": "ROOM 15: THE MEMORY BLOCKS",
-    "subtitle": "Paging",
+    "subtitle": "Virtual Memory Frame Directory",
     "category": "Operating Systems",
     "difficulty": "Easy",
     "enabled": true,
@@ -692,7 +692,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q16",
     "title": "ROOM 16: THE SHORTEST NEARBY PATH",
-    "subtitle": "BFS",
+    "subtitle": "Radial Perimeter Scanner",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -738,7 +738,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q17",
     "title": "ROOM 17: THE DEEPEST ROAD",
-    "subtitle": "DFS",
+    "subtitle": "Subterranean Exploration Probe",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -784,7 +784,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q18",
     "title": "ROOM 18: THE SHIFTED MESSAGE",
-    "subtitle": "Caesar Cipher",
+    "subtitle": "Latverian Transmission Shift",
     "category": "Cryptography",
     "difficulty": "Easy",
     "enabled": true,
@@ -830,7 +830,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q19",
     "title": "ROOM 19: THE SECRET MASK",
-    "subtitle": "XOR",
+    "subtitle": "Differential Parity Gateway",
     "category": "Cryptography",
     "difficulty": "Easy",
     "enabled": true,
@@ -875,7 +875,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q20",
     "title": "ROOM 20: THE FLEXIBLE VAULT",
-    "subtitle": "MongoDB Document",
+    "subtitle": "Dynamic JSON Data Store",
     "category": "DBMS",
     "difficulty": "Easy",
     "enabled": true,
@@ -922,7 +922,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q21",
     "title": "ROOM 21: THE CHAIN OF NODES",
-    "subtitle": "Linked List",
+    "subtitle": "Dynamic Pointer Sequence",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -968,7 +968,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q22",
     "title": "ROOM 22: THE BRANCHING ARCHIVE",
-    "subtitle": "Binary Tree",
+    "subtitle": "Dual-Branch Hierarchical Grid",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -1015,7 +1015,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q23",
     "title": "ROOM 23: THE FAST LOOKUP",
-    "subtitle": "Hash Table",
+    "subtitle": "Direct Key-Value Array",
     "category": "Data Structures",
     "difficulty": "Easy",
     "enabled": true,
@@ -1062,7 +1062,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q24",
     "title": "ROOM 24: THE CLEAN SCHEMA",
-    "subtitle": "Normalization",
+    "subtitle": "Relational Redundancy Audit",
     "category": "DBMS",
     "difficulty": "Easy",
     "enabled": true,
@@ -1108,7 +1108,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q25",
     "title": "ROOM 25: THE PARALLEL WORKER",
-    "subtitle": "Thread",
+    "subtitle": "Concurrent Processing Worker",
     "category": "Operating Systems",
     "difficulty": "Easy",
     "enabled": true,
@@ -1154,7 +1154,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q26",
     "title": "ROOM 26: THE TRAFFIC SIGNAL",
-    "subtitle": "Semaphore",
+    "subtitle": "Concurrency Signaling Gate",
     "category": "Operating Systems",
     "difficulty": "Easy",
     "enabled": true,
@@ -1200,7 +1200,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q27",
     "title": "ROOM 27: THE OPTIMAL ROUTE",
-    "subtitle": "Dijkstra",
+    "subtitle": "Shortest Route Pathfinding",
     "category": "Algorithms",
     "difficulty": "Easy",
     "enabled": true,
@@ -1246,7 +1246,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q28",
     "title": "ROOM 28: THE HIDDEN COMPLEXITY",
-    "subtitle": "Abstraction",
+    "subtitle": "Core Interface Isolation",
     "category": "OOP",
     "difficulty": "Easy",
     "enabled": true,
@@ -1291,7 +1291,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q29",
     "title": "ROOM 29: THE SPEED BUFFER",
-    "subtitle": "Cache",
+    "subtitle": "High-Speed Access Buffer",
     "category": "Operating Systems",
     "difficulty": "Easy",
     "enabled": true,
@@ -1337,7 +1337,7 @@ export const DEFAULT_20_QUESTIONS = [
   {
     "id": "Q30",
     "title": "ROOM 30: THE CROSS REFERENCE",
-    "subtitle": "Foreign Key",
+    "subtitle": "Relational Cross-Table Constraint",
     "category": "DBMS",
     "difficulty": "Easy",
     "enabled": true,
