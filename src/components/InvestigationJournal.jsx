@@ -112,7 +112,7 @@ export function InvestigationJournal({ isOpen, onClose, currentStage, evidenceLi
                   
                   {currentStage?.story && Array.isArray(currentStage.story) && (
                     <div style={{ marginTop: '12px', marginBottom: '12px', padding: '10px 14px', background: 'rgba(0,255,102,0.05)', borderRadius: '6px', borderLeft: '3px solid var(--doom-green)' }}>
-                      <span className="journal-box-label">MISSION INTEL LOG:</span>
+                      <span className="journal-box-label">MISSION BRIEFING LOG:</span>
                       {currentStage.story.map((st, i) => (
                         <p key={i} style={{ fontSize: '0.86rem', lineHeight: '1.5', margin: '4px 0', color: 'var(--ink)' }}>
                           {st}

@@ -91,7 +91,7 @@ export const LevelSelectScreen = ({
                           </span>
                         </div>
                         <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#fff' }}>{lvl.name}</h4>
-                        <p style={{ margin: 0, fontSize: '11px', color: '#8a9b93', lineHeight: '1.3' }}>{lvl.subtitle}</p>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#8a9b93', lineHeight: '1.3' }}>{isDone ? lvl.subtitle : 'CLASSIFIED SECTOR'}</p>
                       </div>
 
                       <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

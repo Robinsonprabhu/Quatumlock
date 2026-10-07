@@ -379,7 +379,7 @@ export default function App() {
     setTransitionData({
       fromRoom: fromTitle,
       toRoom: targetQ ? (targetQ.title || targetQ.name) : `ROOM ${String(nextDisplayNumber).padStart(2, '0')}`,
-      toSubtitle: targetQ ? (targetQ.subtitle || 'Classified Protocol') : 'Classified Protocol',
+      toSubtitle: targetQ ? (targetQ.category || 'Classified Protocol') : 'Classified Protocol',
       toCategory: targetQ ? (targetQ.category || 'Investigation') : 'Investigation',
       toLevelNumber: nextDisplayNumber,
       storyTeaser: targetQ && targetQ.story && targetQ.story[0]
@@ -723,7 +723,7 @@ export default function App() {
 
                   <div style={{ padding: '1.8rem 2rem' }}>
                     <p className="story-eyebrow">
-                      MISSION INTEL LOG — {currentQuestion.subtitle}
+                      CLASSIFIED INVESTIGATION BRIEFING
                     </p>
                     <h2 className="story-title">
                       {currentQuestion.name}
