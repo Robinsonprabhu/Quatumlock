@@ -170,6 +170,33 @@ export const PuzzleCard = ({ stage, hintsUsed, initialInput, isTimeExpired, onSu
         </div>
       </div>
 
+      {/* ─── CHAMBER OBJECTIVE / QUESTION PROMPT ─── */}
+      {stage?.question && (
+        <div style={{
+          padding: '14px 18px',
+          background: 'linear-gradient(90deg, rgba(0, 255, 102, 0.08) 0%, rgba(0, 20, 10, 0.6) 100%)',
+          borderLeft: '4px solid var(--doom-green, #00ff66)',
+          borderBottom: '1px solid rgba(0, 255, 102, 0.15)',
+          fontFamily: 'var(--font-display, "Rajdhani", sans-serif)',
+          fontSize: '1.05rem',
+          color: '#ffffff',
+          letterSpacing: '0.03em',
+          lineHeight: '1.45'
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-mono, monospace)',
+            fontSize: '0.68rem',
+            color: 'var(--doom-green-bright, #00ff66)',
+            letterSpacing: '0.15em',
+            fontWeight: 700,
+            marginBottom: '4px'
+          }}>
+            ▶ ACTIVE CHAMBER OBJECTIVE:
+          </div>
+          <div>{stage.question}</div>
+        </div>
+      )}
+
       {/* ─── ANSWER FORM ─── */}
       <div className="pc-form-area">
         <form onSubmit={handleSubmit}>
