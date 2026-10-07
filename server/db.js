@@ -1,10 +1,16 @@
 import { MongoModels, connectMongoDB, isMongoConnected } from './mongo.js';
 import { DEFAULT_20_QUESTIONS } from './defaultQuestions.js';
 
+let hasInitializedDb = false;
+
 // Ensure MongoDB is connected before any query
 async function ensureDb() {
   if (!isMongoConnected()) {
     await connectMongoDB();
+  }
+  if (!hasInitializedDb && isMongoConnected()) {
+    hasInitializedDb = true;
+    initializeDatabase().catch(() => {});
   }
 }
 
